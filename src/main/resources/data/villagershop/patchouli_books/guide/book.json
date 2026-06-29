@@ -1,0 +1,9 @@
+{
+  "name": "book.villagershop.guide.name",
+  "landing_text": "book.villagershop.guide.landing",
+  "version": "1",
+  "show_progress": false,
+  "model": "patchouli:book_green",
+  "use_resource_pack": true,
+  "i18n": true
+}

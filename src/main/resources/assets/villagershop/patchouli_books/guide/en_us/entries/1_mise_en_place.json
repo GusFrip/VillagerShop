@@ -1,0 +1,16 @@
+{
+  "name": "book.villagershop.guide.e1.name",
+  "icon": "villagershop:shop_counter",
+  "category": "villagershop:main",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e1.p1"
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "villagershop:shop_counter"
+    }
+  ]
+}
