@@ -7,6 +7,9 @@ import com.villagershop.menu.DynamicStorageSlot;
 import com.villagershop.menu.ShopConfigMenu;
 import com.villagershop.menu.ToggleGhostSlot;
 import com.villagershop.menu.UpgradeSlot;
+import com.villagershop.network.LocateVillagerPacket;
+import com.villagershop.network.ExportConfigPacket;
+import com.villagershop.network.ImportConfigPacket;
 import com.villagershop.network.ManageAllowedPacket;
 import com.villagershop.network.ModNetwork;
 import com.villagershop.network.RequestAllowedPacket;
@@ -43,17 +46,17 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
     private static final String[] TAB_KEYS = {"gui.villagershop.tab_shop", "gui.villagershop.tab_trade", "gui.villagershop.tab_stock", "gui.villagershop.tab_upgrade"};
 
     // Copropriétaires (onglet Shop)
-    private static final int CO_X = 8, CO_Y = 78, CO_ROW_H = 11, CO_VISIBLE = 4, CO_W = 158, CO_SB_X = 168;
+    private static final int CO_X = 8, CO_Y = 92, CO_ROW_H = 11, CO_VISIBLE = 3, CO_W = 158, CO_SB_X = 168;
 
     private int currentTab = TAB_SHOP;
 
     private EditBox shopNameField, coownerField;
-    private Button addCoownerBtn;
+    private Button addCoownerBtn, locateBtn, exportBtn, importBtn;
     private String savedShopName = null, savedCoowner = "";
 
     private List<String> coownerNames = new ArrayList<>();
     private int coownerScroll = 0;
-    private boolean storageScrolling = false;
+    private boolean storageScrolling = false, coownerScrolling = false;
 
     public ShopConfigScreen(ShopConfigMenu menu, Inventory inv, Component title) {
         super(menu, inv, title);
@@ -67,7 +70,7 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         this.inventoryLabelX = 8;
         this.inventoryLabelY = ShopConfigMenu.PLAYER_INV_Y - 12;
 
-        shopNameField = new EditBox(font, leftPos + 8, topPos + 32, 168, 14,
+        shopNameField = new EditBox(font, leftPos + 8, topPos + 46, 168, 14,
                 Component.translatable("gui.villagershop.shop_name"));
         shopNameField.setMaxLength(32);
         shopNameField.setHint(Component.translatable("gui.villagershop.shop_name"));
@@ -75,14 +78,25 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         shopNameField.setResponder(t -> ModNetwork.sendToServer(new SetShopNamePacket(menu.getPos(), t)));
         addRenderableWidget(shopNameField);
 
-        coownerField = new EditBox(font, leftPos + 8, topPos + 62, 118, 14,
+        coownerField = new EditBox(font, leftPos + 8, topPos + 76, 118, 14,
                 Component.translatable("gui.villagershop.player_name"));
         coownerField.setHint(Component.translatable("gui.villagershop.player_name"));
         coownerField.setValue(savedCoowner);
         addRenderableWidget(coownerField);
 
         addCoownerBtn = addRenderableWidget(Button.builder(Component.translatable("gui.villagershop.add"), b -> addCoowner())
-                .bounds(leftPos + 130, topPos + 61, 46, 16).build());
+                .bounds(leftPos + 130, topPos + 75, 46, 16).build());
+
+        locateBtn = addRenderableWidget(Button.builder(Component.translatable("gui.villagershop.locate"),
+                        b -> ModNetwork.sendToServer(new LocateVillagerPacket(menu.getPos())))
+                .bounds(leftPos + 8, topPos + 60, 160, 16).build());
+
+        exportBtn = addRenderableWidget(Button.builder(Component.translatable("gui.villagershop.export"),
+                        b -> ModNetwork.sendToServer(new ExportConfigPacket(menu.getPos())))
+                .bounds(leftPos + 28, topPos + 90, 54, 16).build());
+        importBtn = addRenderableWidget(Button.builder(Component.translatable("gui.villagershop.import_"),
+                        b -> ModNetwork.sendToServer(new ImportConfigPacket(menu.getPos())))
+                .bounds(leftPos + 86, topPos + 90, 54, 16).build());
 
         setActiveTab(currentTab);
         ModNetwork.sendToServer(new RequestAllowedPacket(menu.getPos()));
@@ -90,10 +104,16 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
 
     private void setActiveTab(int tab) {
         this.currentTab = tab;
-        shopNameField.visible = (tab == TAB_SHOP);
-        coownerField.visible = (tab == TAB_SHOP);
-        addCoownerBtn.visible = (tab == TAB_SHOP);
+        updateSlotVisibility();
     }
+
+    private boolean upgradePresent(int i) {
+        int idx = ShopConfigMenu.UPGRADE_START + i;
+        return idx < menu.slots.size() && menu.slots.get(idx).hasItem();
+    }
+    private boolean hasCommClient()   { return upgradePresent(2); }
+    private boolean hasMemoryClient() { return upgradePresent(3); }
+    private boolean hasAccessClient() { return upgradePresent(4); }
 
     private void addCoowner() {
         String name = coownerField.getValue().trim();
@@ -132,6 +152,18 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         boolean up = currentTab == TAB_UPGRADE;
         for (int i = ShopConfigMenu.UPGRADE_START; i < ShopConfigMenu.UPGRADE_START + ShopConfigMenu.UPGRADE_COUNT; i++)
             ((UpgradeSlot) menu.slots.get(i)).setVisible(up);
+
+        // Modules conditionnels (visibles seulement si l'upgrade correspondant est posé)
+        boolean shop = currentTab == TAB_SHOP;
+        if (shopNameField != null) shopNameField.visible = shop;
+        if (locateBtn != null)     locateBtn.visible = (currentTab == TAB_UPGRADE) && hasCommClient();
+        boolean access = shop && hasAccessClient();
+        if (coownerField != null)  coownerField.visible = access;
+        if (addCoownerBtn != null) addCoownerBtn.visible = access;
+        boolean save = (currentTab == TAB_UPGRADE) && hasMemoryClient();
+        if (exportBtn != null) exportBtn.visible = save;
+        if (importBtn != null) importBtn.visible = save;
+        ((UpgradeSlot) menu.slots.get(ShopConfigMenu.SAVE_SLOT_INDEX)).setVisible(save);
     }
 
     @Override
@@ -159,8 +191,9 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         gg.drawString(font, tabTitle, (imageWidth - font.width(tabTitle)) / 2, 24, 0x404040, false);
 
         if (currentTab == TAB_SHOP) {
-            gg.drawString(font, Component.translatable("gui.villagershop.shop_name"), 8, 22, 0x404040, false);
-            gg.drawString(font, Component.translatable("gui.villagershop.coowners"), 8, 52, 0x404040, false);
+            gg.drawString(font, Component.translatable("gui.villagershop.shop_name"), 8, 36, 0x404040, false);
+            if (hasAccessClient())
+                gg.drawString(font, Component.translatable("gui.villagershop.coowners"), 8, 66, 0x404040, false);
         } else if (currentTab == TAB_TRADE) {
             for (int i = 0; i < ShopConfigMenu.OFFERS; i++) {
                 int base = (i / ShopConfigMenu.OFFER_ROWS == 0) ? ShopConfigMenu.COL0_X : ShopConfigMenu.COL1_X;
@@ -175,9 +208,8 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
                     menu.getChestCount(), menu.getActiveCapacity()), 8, 40, 0x404040, false);
             gg.drawString(font, Component.translatable("gui.villagershop.stock"), 8, ShopConfigMenu.STORAGE_Y - 11, 0x404040, false);
         } else if (currentTab == TAB_UPGRADE) {
-            gg.drawString(font, Component.translatable("gui.villagershop.upgrades"), 8, 43, 0x404040, false);
-            gg.drawString(font, Component.translatable("gui.villagershop.capacity",
-                    menu.getChestCount(), menu.getActiveCapacity()), 70, 60, 0x404040, false);
+            if (hasMemoryClient())
+                gg.drawString(font, Component.translatable("gui.villagershop.save_module"), 8, 80, 0x404040, false);
         }
     }
 
@@ -187,9 +219,9 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         renderBackground(gg);
         super.render(gg, mouseX, mouseY, partialTick);
         renderTabs(gg);
-        if (currentTab == TAB_SHOP) renderCoownerList(gg, mouseX, mouseY);
+        if (currentTab == TAB_SHOP && hasAccessClient()) renderCoownerList(gg, mouseX, mouseY);
         else if (currentTab == TAB_STOCK) renderStorageScrollbar(gg);
-        else if (currentTab == TAB_UPGRADE) { renderGhostUpgrades(gg); renderGhostChest(gg); }
+        else if (currentTab == TAB_UPGRADE) { renderGhostUpgrades(gg); renderGhostChest(gg); renderGhostSave(gg); }
         renderTabTooltips(gg, mouseX, mouseY);
         renderTooltip(gg, mouseX, mouseY);
     }
@@ -229,13 +261,14 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
 
     /** Coffre grisé indiquant ce qu'on peut déposer (façon lapis de la table d'enchantement). */
     private static final ItemStack[] UPGRADE_HINTS = {
-            new ItemStack(Items.NETHER_STAR), new ItemStack(Items.PRISMARINE_SHARD)};
+            new ItemStack(Items.NETHER_STAR), new ItemStack(Items.PRISMARINE_SHARD), new ItemStack(Items.LIGHTNING_ROD),
+            new ItemStack(Items.BOOKSHELF), new ItemStack(Items.GOLD_BLOCK)};
 
     private void renderGhostUpgrades(GuiGraphics gg) {
         for (int i = 0; i < ShopConfigMenu.UPGRADE_COUNT; i++) {
             if (menu.slots.get(ShopConfigMenu.UPGRADE_START + i).hasItem()) continue;
-            int x = leftPos + ShopConfigMenu.UPGRADE_X + i * ShopConfigMenu.UPGRADE_DX;
-            int y = topPos + ShopConfigMenu.UPGRADE_Y;
+            int x = leftPos + ShopConfigMenu.UPGRADE_XS[i];
+            int y = topPos + ShopConfigMenu.UPGRADE_YS[i];
             gg.renderItem(UPGRADE_HINTS[i], x, y);
             gg.pose().pushPose();
             gg.pose().translate(0, 0, 200);
@@ -251,6 +284,17 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         gg.pose().pushPose();
         gg.pose().translate(0, 0, 200);
         gg.fill(x, y, x + 16, y + 16, 0xAAC6C6C6); // voile pour griser
+        gg.pose().popPose();
+    }
+
+    private void renderGhostSave(GuiGraphics gg) {
+        if (!hasMemoryClient()) return;
+        if (menu.slots.get(ShopConfigMenu.SAVE_SLOT_INDEX).hasItem()) return;
+        int x = leftPos + ShopConfigMenu.SAVE_SLOT_X, y = topPos + ShopConfigMenu.SAVE_SLOT_Y;
+        gg.renderItem(new ItemStack(Items.WRITABLE_BOOK), x, y);
+        gg.pose().pushPose();
+        gg.pose().translate(0, 0, 200);
+        gg.fill(x, y, x + 16, y + 16, 0xAAC6C6C6);
         gg.pose().popPose();
     }
 
@@ -289,7 +333,7 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
 
     @Override
     public boolean mouseScrolled(double mx, double my, double delta) {
-        if (currentTab == TAB_SHOP && over(mx, my, leftPos + CO_X, topPos + CO_Y, CO_W, CO_VISIBLE * CO_ROW_H)) {
+        if (currentTab == TAB_SHOP && hasAccessClient() && over(mx, my, leftPos + CO_X, topPos + CO_Y, CO_W, CO_VISIBLE * CO_ROW_H)) {
             int max = Math.max(0, coownerNames.size() - CO_VISIBLE);
             if (max > 0) { coownerScroll = Math.max(0, Math.min(coownerScroll - (int) Math.signum(delta), max)); return true; }
         }
@@ -311,12 +355,18 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         int t = tabAt(mx, my);
         if (t >= 0) { setActiveTab(t); return true; }
 
-        if (currentTab == TAB_SHOP && over(mx, my, leftPos + CO_X, topPos + CO_Y, CO_W, CO_VISIBLE * CO_ROW_H)) {
+        if (currentTab == TAB_SHOP && hasAccessClient() && over(mx, my, leftPos + CO_X, topPos + CO_Y, CO_W, CO_VISIBLE * CO_ROW_H)) {
             int r = (int) ((my - (topPos + CO_Y)) / CO_ROW_H);
             int idx = coownerScroll + r;
             if (r >= 0 && r < CO_VISIBLE && idx < coownerNames.size()) {
                 ModNetwork.sendToServer(new ManageAllowedPacket(menu.getPos(), coownerNames.get(idx), false));
                 return true;
+            }
+        }
+        if (currentTab == TAB_SHOP && hasAccessClient()) {
+            int track = CO_VISIBLE * CO_ROW_H, max = Math.max(0, coownerNames.size() - CO_VISIBLE);
+            if (max > 0 && over(mx, my, leftPos + CO_SB_X, topPos + CO_Y, 14, track)) {
+                coownerScrolling = true; dragCoowner(my); return true;
             }
         }
         if (currentTab == TAB_STOCK) {
@@ -331,12 +381,14 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
     @Override
     public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
         if (storageScrolling) { dragStorage(my); return true; }
+        if (coownerScrolling) { dragCoowner(my); return true; }
         return super.mouseDragged(mx, my, button, dx, dy);
     }
 
     @Override
     public boolean mouseReleased(double mx, double my, int button) {
         storageScrolling = false;
+        coownerScrolling = false;
         return super.mouseReleased(mx, my, button);
     }
 
@@ -347,6 +399,15 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         double rel = (my - (y + 7.5)) / (track - 15);
         rel = Math.max(0.0, Math.min(1.0, rel));
         applyStorageScroll((int) Math.round(rel * max));
+    }
+
+    private void dragCoowner(double my) {
+        int max = Math.max(0, coownerNames.size() - CO_VISIBLE);
+        if (max <= 0) return;
+        int y = topPos + CO_Y, track = CO_VISIBLE * CO_ROW_H;
+        double rel = (my - (y + 7.5)) / (track - 15);
+        rel = Math.max(0.0, Math.min(1.0, rel));
+        coownerScroll = (int) Math.round(rel * max);
     }
 
     @Override

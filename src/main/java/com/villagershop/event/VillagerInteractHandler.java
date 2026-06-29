@@ -13,14 +13,15 @@ import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.npc.VillagerProfession;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraft.server.level.ServerLevel;
+import com.villagershop.notify.ShopNotifications;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Intercepte le clic droit sur un villageois "shopkeeper" (celui qui occupe un
@@ -86,13 +87,17 @@ public class VillagerInteractHandler {
         BlockPos pos = jobSite.get().pos();
         if (!(level.getBlockEntity(pos) instanceof ShopBlockEntity be)) return;
 
-        MinecraftServer server = villager.getServer();
-        if (server == null) return;
-        Component msg = Component.translatable("message.villagershop.merchant_died",
-                be.getShopNameOrDefault(), pos.getX(), pos.getY(), pos.getZ());
-        for (UUID id : be.getOwnersAndCoowners()) {
-            ServerPlayer p = server.getPlayerList().getPlayer(id);
-            if (p != null) p.sendSystemMessage(msg);
+        if (!be.hasNotifier()) return; // paratonnerre requis pour les notifications
+        if (level instanceof ServerLevel sl) {
+            ShopNotifications.dispatch(sl, be, ShopNotifications.Reason.DEATH);
+        }
+    }
+
+    /** À la connexion d'un joueur : délivre ses notifications de boutique en attente. */
+    @SubscribeEvent
+    public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer sp && sp.getServer() != null) {
+            ShopNotifications.get(sp.getServer()).deliver(sp);
         }
     }
 }

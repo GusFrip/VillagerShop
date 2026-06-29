@@ -33,6 +33,12 @@ public class ModNetwork {
                 RequestOffersPacket::encode, RequestOffersPacket::decode, RequestOffersPacket::handle);
         CHANNEL.registerMessage(id++, OpenSubScreenPacket.class,
                 OpenSubScreenPacket::encode, OpenSubScreenPacket::decode, OpenSubScreenPacket::handle);
+        CHANNEL.registerMessage(id++, LocateVillagerPacket.class,
+                LocateVillagerPacket::encode, LocateVillagerPacket::decode, LocateVillagerPacket::handle);
+        CHANNEL.registerMessage(id++, ExportConfigPacket.class,
+                ExportConfigPacket::encode, ExportConfigPacket::decode, ExportConfigPacket::handle);
+        CHANNEL.registerMessage(id++, ImportConfigPacket.class,
+                ImportConfigPacket::encode, ImportConfigPacket::decode, ImportConfigPacket::handle);
     }
 
     public static void sendToServer(Object msg) {

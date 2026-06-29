@@ -77,7 +77,7 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
     };
 
     /** Améliorations : 0=Nether Star (invincible), 1=Prismarine(tether)/Amethyst(statique). */
-    private final ItemStackHandler upgrades = new ItemStackHandler(2) {
+    private final ItemStackHandler upgrades = new ItemStackHandler(5) {
         @Override
         public int getSlotLimit(int slot) {
             return 1;
@@ -88,6 +88,9 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
             return switch (slot) {
                 case 0 -> stack.is(Items.NETHER_STAR);
                 case 1 -> stack.is(Items.PRISMARINE_SHARD) || stack.is(Items.AMETHYST_SHARD);
+                case 2 -> stack.is(Items.LIGHTNING_ROD);
+                case 3 -> stack.is(Items.BOOKSHELF);
+                case 4 -> stack.is(Items.GOLD_BLOCK);
                 default -> false;
             };
         }
@@ -96,7 +99,28 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         protected void onContentsChanged(int slot) {
             setChanged();
         }
+
+        @Override
+        public void deserializeNBT(CompoundTag nbt) {
+            // Taille fixe (5) : on ignore le "Size" d'anciennes sauvegardes (2/3 slots)
+            // pour ne pas rétrécir le handler et planter à l'ajout des slots récents.
+            setSize(5);
+            ListTag items = nbt.getList("Items", Tag.TAG_COMPOUND);
+            for (int i = 0; i < items.size(); i++) {
+                CompoundTag it = items.getCompound(i);
+                int slot = it.getInt("Slot");
+                if (slot >= 0 && slot < 5) setStackInSlot(slot, ItemStack.of(it));
+            }
+        }
     };
+
+    private final ItemStackHandler saveSlot = new ItemStackHandler(1) {
+        @Override public int getSlotLimit(int slot) { return 1; }
+        @Override public boolean isItemValid(int slot, @NotNull ItemStack stack) { return stack.is(Items.WRITABLE_BOOK); }
+        @Override protected void onContentsChanged(int slot) { setChanged(); }
+    };
+
+    public ItemStackHandler getSaveSlot() { return saveSlot; }
 
     public enum MovementMode { FREE, TETHER, STATIC }
 
@@ -128,6 +152,84 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         if (s.is(Items.AMETHYST_SHARD)) return MovementMode.STATIC;
         if (s.is(Items.PRISMARINE_SHARD)) return MovementMode.TETHER;
         return MovementMode.FREE;
+    }
+
+    /** Paratonnerre installé : le propriétaire reçoit les notifications. */
+    public boolean hasNotifier() { return !upgrades.getStackInSlot(2).isEmpty(); }
+
+    /** Obsidienne : module de sauvegarde (export/import livre) accessible. */
+    public boolean hasMemory() { return !upgrades.getStackInSlot(3).isEmpty(); }
+
+    /** Bloc d'or : gestion des co-propriétaires accessible. */
+    public boolean hasAccess() { return !upgrades.getStackInSlot(4).isEmpty(); }
+
+    /** Sérialise la config (nom, offres, co-proprios) — pour le livre de sauvegarde. */
+    public CompoundTag exportConfig() {
+        CompoundTag cfg = new CompoundTag();
+        cfg.putString("ShopName", shopName);
+        ListTag off = new ListTag();
+        for (int i = 0; i < MAX_OFFERS; i++) { CompoundTag e = offers[i].save(); e.putInt("Index", i); off.add(e); }
+        cfg.put("Offers", off);
+        ListTag al = new ListTag();
+        for (UUID id : allowed) { CompoundTag e = new CompoundTag(); e.putUUID("Id", id); e.putString("Name", nameCache.getOrDefault(id, "")); al.add(e); }
+        cfg.put("Allowed", al);
+        return cfg;
+    }
+
+    /** Applique une config importée (n'écrase pas le propriétaire). */
+    public void importConfig(CompoundTag cfg) {
+        if (cfg.contains("ShopName")) shopName = cfg.getString("ShopName");
+        for (int i = 0; i < MAX_OFFERS; i++) offers[i] = new ShopOffer();
+        ListTag off = cfg.getList("Offers", Tag.TAG_COMPOUND);
+        for (int i = 0; i < off.size(); i++) { CompoundTag e = off.getCompound(i); int idx = e.getInt("Index"); if (idx >= 0 && idx < MAX_OFFERS) offers[idx] = ShopOffer.load(e); }
+        allowed.clear();
+        ListTag al = cfg.getList("Allowed", Tag.TAG_COMPOUND);
+        for (int i = 0; i < al.size(); i++) { CompoundTag e = al.getCompound(i); UUID id = e.getUUID("Id"); allowed.add(id); nameCache.put(id, e.getString("Name")); }
+        setChanged();
+    }
+
+    /** Écrit la config dans le livre & plume présent dans le slot de sauvegarde. */
+    public boolean writeConfigToSaveBook() {
+        ItemStack book = saveSlot.getStackInSlot(0);
+        if (!book.is(Items.WRITABLE_BOOK)) return false;
+        CompoundTag tag = book.getOrCreateTag();
+        tag.put("ShopConfig", exportConfig());
+        book.setHoverName(net.minecraft.network.chat.Component.translatable("item.villagershop.save_book", getShopNameOrDefault()));
+        saveSlot.setStackInSlot(0, book);
+        setChanged();
+        return true;
+    }
+
+    /** Lit la config depuis le livre du slot de sauvegarde et l'applique. */
+    public boolean readConfigFromSaveBook() {
+        ItemStack book = saveSlot.getStackInSlot(0);
+        if (book.isEmpty() || !book.hasTag() || !book.getTag().contains("ShopConfig")) return false;
+        importConfig(book.getTag().getCompound("ShopConfig"));
+        return true;
+    }
+
+    // Drapeaux anti-spam (non persistés) : état "déjà notifié" par type de blocage.
+    private boolean supplyFlagged = false;
+    private boolean stockFlagged = false;
+
+    /** Une vente est bloquée par manque de MARCHANDISE (result indisponible). */
+    public boolean hasSupplyProblem() {
+        for (int i = 0; i < MAX_OFFERS; i++) {
+            ShopOffer o = offers[i];
+            if (!o.isValid()) continue;
+            if (countInStorage(o.getResult()) < o.getResult().getCount()) return true;
+        }
+        return false;
+    }
+
+    /** Une vente est bloquée par manque de PLACE pour encaisser le paiement (stock plein). */
+    public boolean hasStockProblem() {
+        for (int i = 0; i < MAX_OFFERS; i++) {
+            ShopOffer o = offers[i];
+            if (!o.isValid()) continue;
+            if (countInStorage(o.getResult()) >= o.getResult().getCount() && maxTrades(o) == 0) return true;
+        }
+        return false;
     }
 
     public int getChestCount() {
@@ -176,7 +278,8 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
 
     public boolean canAccess(Player player) {
         if (owner == null) return true;
-        return isOwner(player) || allowed.contains(player.getUUID());
+        if (isOwner(player)) return true;
+        return hasAccess() && allowed.contains(player.getUUID());
     }
 
     public void addAllowed(UUID uuid, String name) {
@@ -193,6 +296,7 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
 
     public List<String> getAllowedNames() {
         List<String> names = new ArrayList<>();
+        if (owner != null) names.add(nameCache.getOrDefault(owner, "Owner")); // owner en tête, non supprimable
         for (UUID id : allowed) names.add(nameCache.getOrDefault(id, id.toString()));
         return names;
     }
@@ -300,6 +404,84 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         }
     }
 
+    /**
+     * Nombre maximum d'achats possibles pour cette offre SANS aucune perte : il faut
+     * à la fois assez de marchandise en stock ET assez de place pour encaisser le(s)
+     * paiement(s). On simule les transactions successives sur une copie du stock.
+     */
+    public int maxTrades(ShopOffer offer) {
+        if (!offer.isValid()) return 0;
+        int cap = getActiveCapacity();
+        int resultPer = offer.getResult().getCount();
+        if (resultPer <= 0) return 0;
+
+        ItemStack[] sim = new ItemStack[cap];
+        int[] limit = new int[cap];
+        for (int i = 0; i < cap; i++) {
+            sim[i] = storage.getStackInSlot(i).copy();
+            limit[i] = storage.getSlotLimit(i);
+        }
+
+        ItemStack priceA = offer.getPriceA();
+        ItemStack priceB = offer.getPriceB();
+
+        int trades = 0;
+        int safety = cap * 64 + 1;
+        while (trades < safety) {
+            if (simCount(sim, offer.getResult()) < resultPer) break;
+            // copie de l'itération : on n'applique que si tout passe
+            ItemStack[] next = new ItemStack[cap];
+            int[] lim = new int[cap];
+            for (int i = 0; i < cap; i++) { next[i] = sim[i].copy(); lim[i] = limit[i]; }
+            simRemove(next, offer.getResult(), resultPer);
+            if (!simInsert(next, lim, priceA)) break;
+            if (!priceB.isEmpty() && !simInsert(next, lim, priceB)) break;
+            sim = next; limit = lim;
+            trades++;
+        }
+        return trades;
+    }
+
+    private int simCount(ItemStack[] sim, ItemStack like) {
+        int t = 0;
+        for (ItemStack s : sim) if (!s.isEmpty() && ItemStack.isSameItemSameTags(s, like)) t += s.getCount();
+        return t;
+    }
+
+    private void simRemove(ItemStack[] sim, ItemStack like, int amount) {
+        for (int i = 0; i < sim.length && amount > 0; i++) {
+            ItemStack s = sim[i];
+            if (!s.isEmpty() && ItemStack.isSameItemSameTags(s, like)) {
+                int take = Math.min(amount, s.getCount());
+                s.shrink(take);
+                if (s.isEmpty()) sim[i] = ItemStack.EMPTY;
+                amount -= take;
+            }
+        }
+    }
+
+    /** Simule une insertion (piles existantes puis slots vides) ; true si tout rentre. */
+    private boolean simInsert(ItemStack[] sim, int[] limit, ItemStack stack) {
+        if (stack.isEmpty()) return true;
+        int remaining = stack.getCount();
+        int maxStack = stack.getMaxStackSize();
+        for (int i = 0; i < sim.length && remaining > 0; i++) {
+            ItemStack s = sim[i];
+            if (!s.isEmpty() && ItemStack.isSameItemSameTags(s, stack)) {
+                int space = Math.min(maxStack, limit[i]) - s.getCount();
+                if (space > 0) { int add = Math.min(space, remaining); s.grow(add); remaining -= add; }
+            }
+        }
+        for (int i = 0; i < sim.length && remaining > 0; i++) {
+            if (sim[i].isEmpty()) {
+                int add = Math.min(Math.min(maxStack, limit[i]), remaining);
+                ItemStack ns = stack.copy(); ns.setCount(add);
+                sim[i] = ns; remaining -= add;
+            }
+        }
+        return remaining <= 0;
+    }
+
     // ----- Transaction (serveur) ------------------------------------------
 
     public boolean canFulfill(ShopOffer offer) {
@@ -367,6 +549,7 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         tag.put("Storage", storage.serializeNBT());
         tag.put("ChestUpgrade", chestUpgrade.serializeNBT());
         tag.put("Upgrades", upgrades.serializeNBT());
+        tag.put("SaveSlot", saveSlot.serializeNBT());
         if (owner != null) tag.putUUID("Owner", owner);
 
         ListTag allowedList = new ListTag();
@@ -395,6 +578,7 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         if (tag.contains("Storage")) storage.deserializeNBT(tag.getCompound("Storage"));
         if (tag.contains("ChestUpgrade")) chestUpgrade.deserializeNBT(tag.getCompound("ChestUpgrade"));
         if (tag.contains("Upgrades")) upgrades.deserializeNBT(tag.getCompound("Upgrades"));
+        if (tag.contains("SaveSlot")) saveSlot.deserializeNBT(tag.getCompound("SaveSlot"));
         shopName = tag.getString("ShopName");
         owner = tag.hasUUID("Owner") ? tag.getUUID("Owner") : null;
 
@@ -421,10 +605,11 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
     /** Lâche tout (stock + coffres installés) quand le bloc est cassé. */
     public void dropContents() {
         if (level == null) return;
-        SimpleContainer c = new SimpleContainer(MAX_STORAGE + 4);
+        SimpleContainer c = new SimpleContainer(MAX_STORAGE + 2 + upgrades.getSlots());
         for (int i = 0; i < MAX_STORAGE; i++) c.setItem(i, storage.getStackInSlot(i));
         c.setItem(MAX_STORAGE, chestUpgrade.getStackInSlot(0));
         for (int i = 0; i < upgrades.getSlots(); i++) c.setItem(MAX_STORAGE + 1 + i, upgrades.getStackInSlot(i));
+        c.setItem(MAX_STORAGE + 1 + upgrades.getSlots(), saveSlot.getStackInSlot(0));
         Containers.dropContents(level, getBlockPos(), c);
     }
 
@@ -447,6 +632,25 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
     public static void serverTick(Level level, BlockPos pos, BlockState state, ShopBlockEntity be) {
         if (level.getGameTime() % 20L != 0L) return;
         be.applyToVillager(level, pos, state);
+        be.checkNotifications(level);
+    }
+
+    /** Détecte les transitions OK -> bloqué et notifie les proprios (si paratonnerre). */
+    private void checkNotifications(Level level) {
+        if (!(level instanceof net.minecraft.server.level.ServerLevel sl)) return;
+        if (!hasNotifier()) { supplyFlagged = false; stockFlagged = false; return; }
+        boolean sup = hasSupplyProblem();
+        boolean st = hasStockProblem();
+        if (sup && !supplyFlagged) {
+            com.villagershop.notify.ShopNotifications.dispatch(sl, this,
+                    com.villagershop.notify.ShopNotifications.Reason.SUPPLY);
+        }
+        supplyFlagged = sup;
+        if (st && !stockFlagged) {
+            com.villagershop.notify.ShopNotifications.dispatch(sl, this,
+                    com.villagershop.notify.ShopNotifications.Reason.STOCK);
+        }
+        stockFlagged = st;
     }
 
     private void applyToVillager(Level level, BlockPos pos, BlockState state) {
@@ -501,6 +705,16 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
             v.setVillagerData(v.getVillagerData().setProfession(net.minecraft.world.entity.npc.VillagerProfession.NONE));
             v.getBrain().eraseMemory(MemoryModuleType.JOB_SITE);
         }
+    }
+
+    @Nullable
+    public Villager findShopkeeper() {
+        if (level == null) return null;
+        net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(getBlockPos()).inflate(16.0);
+        for (Villager v : level.getEntitiesOfClass(Villager.class, box)) {
+            if (isThisShopkeeper(v, level, getBlockPos())) return v;
+        }
+        return null;
     }
 
     private static boolean isThisShopkeeper(Villager v, Level level, BlockPos pos) {

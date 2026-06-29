@@ -43,6 +43,10 @@ public class ManageAllowedPacket {
                 player.displayClientMessage(Component.translatable("message.villagershop.not_owner"), true);
                 return;
             }
+            if (!be.hasAccess()) {
+                player.displayClientMessage(Component.translatable("message.villagershop.no_access_module"), true);
+                return;
+            }
             MinecraftServer server = player.server;
             ServerPlayer online = server.getPlayerList().getPlayerByName(msg.name);
             java.util.UUID uuid = null;
@@ -61,6 +65,12 @@ public class ManageAllowedPacket {
             if (uuid == null) {
                 player.displayClientMessage(Component.translatable("message.villagershop.unknown_player", msg.name), true);
                 return;
+            }
+            if (!msg.add) {
+                if (uuid.equals(be.getOwner()) || uuid.equals(player.getUUID())) {
+                    player.displayClientMessage(Component.translatable("message.villagershop.cant_remove"), true);
+                    return;
+                }
             }
             if (msg.add) be.addAllowed(uuid, resolvedName);
             else be.removeAllowed(uuid);

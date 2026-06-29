@@ -32,12 +32,13 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     public static final int GHOST_SLOTS = OFFERS * GHOST_PER_OFFER; // 24
     public static final int CHEST_SLOT_INDEX = GHOST_SLOTS;         // 24
     public static final int STORAGE_START = GHOST_SLOTS + 1;        // 25
-    public static final int VISIBLE_ROWS = 2;
-    public static final int STORAGE_VISIBLE = VISIBLE_ROWS * 9;     // 18
-    public static final int STORAGE_END = STORAGE_START + STORAGE_VISIBLE; // 43
+    public static final int VISIBLE_ROWS = 3;
+    public static final int STORAGE_VISIBLE = VISIBLE_ROWS * 9;     // 27
+    public static final int STORAGE_END = STORAGE_START + STORAGE_VISIBLE; // 52
     public static final int UPGRADE_START = STORAGE_END;            // 43 (3 slots)
-    public static final int UPGRADE_COUNT = 2;
-    public static final int INV_START = UPGRADE_START + UPGRADE_COUNT; // 46
+    public static final int UPGRADE_COUNT = 5;
+    public static final int SAVE_SLOT_INDEX = UPGRADE_START + UPGRADE_COUNT;
+    public static final int INV_START = SAVE_SLOT_INDEX + 1;
     public static final int INV_END = INV_START + 36;               // 82
 
     // Grille d'offres : 2 colonnes de 4
@@ -46,8 +47,10 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     public static final int COL0_X = 0, COL1_X = 90;
     public static final int OFF_PRICE_A_DX = 8, OFF_PRICE_B_DX = 30, OFF_RESULT_DX = 62;
 
-    public static final int CHEST_SLOT_X = 48, CHEST_SLOT_Y = 56;
-    public static final int UPGRADE_X = 8, UPGRADE_Y = 56, UPGRADE_DX = 20;
+    public static final int CHEST_SLOT_X = 137, CHEST_SLOT_Y = 40;
+    public static final int[] UPGRADE_XS = {37, 57, 77, 97, 117}; // immortalité, déplacement, communication, mémoire, accès (coffre à 137)
+    public static final int[] UPGRADE_YS = {40, 40, 40, 40, 40};
+    public static final int SAVE_SLOT_X = 8, SAVE_SLOT_Y = 90;
     public static final int STORAGE_X = 8, STORAGE_Y = 62;
     public static final int PLAYER_INV_X = 8, PLAYER_INV_Y = 138;
 
@@ -63,16 +66,16 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     /** Constructeur CLIENT. */
     public ShopConfigMenu(int id, Inventory inv, FriendlyByteBuf buf) {
         this(id, inv, null, buf.readBlockPos(), buf.readUtf(), new SimpleContainer(GHOST_SLOTS),
-                new ItemStackHandler(ShopBlockEntity.MAX_STORAGE), new ItemStackHandler(1), new ItemStackHandler(2));
+                new ItemStackHandler(ShopBlockEntity.MAX_STORAGE), new ItemStackHandler(1), new ItemStackHandler(5), new ItemStackHandler(1));
     }
 
     /** Constructeur SERVEUR. */
     public ShopConfigMenu(int id, Inventory inv, ShopBlockEntity be) {
-        this(id, inv, be, be.getBlockPos(), be.getShopName(), buildTemplatesFrom(be), be.getStorage(), be.getChestUpgrade(), be.getUpgrades());
+        this(id, inv, be, be.getBlockPos(), be.getShopName(), buildTemplatesFrom(be), be.getStorage(), be.getChestUpgrade(), be.getUpgrades(), be.getSaveSlot());
     }
 
     private ShopConfigMenu(int id, Inventory inv, @Nullable ShopBlockEntity be, BlockPos pos, String shopName,
-                           Container templates, IItemHandlerModifiable storage, IItemHandler chestHandler, IItemHandler upgradeHandler) {
+                           Container templates, IItemHandlerModifiable storage, IItemHandler chestHandler, IItemHandler upgradeHandler, IItemHandler saveHandler) {
         super(ModMenus.SHOP_CONFIG.get(), id);
         this.be = be;
         this.pos = pos;
@@ -103,8 +106,10 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
 
         // améliorations (3 slots)
         for (int i = 0; i < UPGRADE_COUNT; i++) {
-            addSlot(new UpgradeSlot(upgradeHandler, i, UPGRADE_X + i * UPGRADE_DX, UPGRADE_Y));
+            addSlot(new UpgradeSlot(upgradeHandler, i, UPGRADE_XS[i], UPGRADE_YS[i]));
         }
+        // slot de sauvegarde (livre & plume), onglet Upgrade
+        addSlot(new UpgradeSlot(saveHandler, 0, SAVE_SLOT_X, SAVE_SLOT_Y));
 
         // inventaire
         for (int row = 0; row < 3; row++) {
@@ -193,12 +198,13 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
         if (slot == null || !slot.hasItem() || isGhost(index)) return ItemStack.EMPTY;
         ItemStack stack = slot.getItem();
         ItemStack result = stack.copy();
-        if (index == CHEST_SLOT_INDEX || (index >= STORAGE_START && index < STORAGE_END)
+        if (index == CHEST_SLOT_INDEX || index == SAVE_SLOT_INDEX || (index >= STORAGE_START && index < STORAGE_END)
                 || (index >= UPGRADE_START && index < UPGRADE_START + UPGRADE_COUNT)) {
             if (!moveItemStackTo(stack, INV_START, INV_END, true)) return ItemStack.EMPTY;
         } else {
             boolean moved = false;
             if (stack.is(Items.CHEST)) moved = moveItemStackTo(stack, CHEST_SLOT_INDEX, CHEST_SLOT_INDEX + 1, false);
+            if (!stack.isEmpty() && stack.is(Items.WRITABLE_BOOK)) moved = moveItemStackTo(stack, SAVE_SLOT_INDEX, SAVE_SLOT_INDEX + 1, false) || moved;
             if (!stack.isEmpty()) moved = moveItemStackTo(stack, UPGRADE_START, UPGRADE_START + UPGRADE_COUNT, false) || moved;
             if (!stack.isEmpty()) moved = moveItemStackTo(stack, STORAGE_START, STORAGE_END, false) || moved;
             if (!moved) return ItemStack.EMPTY;

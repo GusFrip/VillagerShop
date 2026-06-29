@@ -36,7 +36,7 @@ public class ShopOffer {
     }
 
     public boolean isValid() {
-        return !result.isEmpty() && !priceA.isEmpty();
+        return !result.isEmpty() && (!priceA.isEmpty() || !priceB.isEmpty());
     }
 
     public CompoundTag save() {

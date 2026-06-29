@@ -34,11 +34,16 @@ public class ShopMerchant implements Merchant {
         for (int i = 0; i < ShopBlockEntity.MAX_OFFERS; i++) {
             ShopOffer o = be.getOffer(i);
             if (!o.isValid()) continue;
-            int per = o.getResult().getCount();
-            int avail = per > 0 ? be.countStock(o.getResult()) / per : 0;
+            // nb d'achats possibles = min(marchandise dispo, place pour encaisser le paiement)
+            int avail = be.maxTrades(o);
+            // Vanilla exige un coût principal (costA) non vide : si le proprio n'a
+            // rempli que le 2e slot de prix, on le bascule en coût principal.
+            ItemStack pa = o.getPriceA().copy();
+            ItemStack pb = o.getPriceB().copy();
+            if (pa.isEmpty() && !pb.isEmpty()) { pa = pb; pb = ItemStack.EMPTY; }
             list.add(new MerchantOffer(
-                    o.getPriceA().copy(),
-                    o.getPriceB().copy(),
+                    pa,
+                    pb,
                     o.getResult().copy(),
                     0,                       // uses
                     Math.max(0, avail),      // maxUses = nb d'achats possibles selon le stock
