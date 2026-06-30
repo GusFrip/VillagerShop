@@ -3,8 +3,10 @@ package com.villagershop.registry;
 import com.villagershop.ShopMod;
 import com.villagershop.menu.ShopConfigMenu;
 import com.villagershop.menu.ShopStockMenu;
+import com.villagershop.menu.ShopMerchantMenu;
 import com.villagershop.menu.ShopTradeMenu;
 import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.flag.FeatureFlags;
 import net.minecraftforge.common.extensions.IForgeMenuType;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.registries.DeferredRegister;
@@ -23,6 +25,10 @@ public class ModMenus {
 
     public static final RegistryObject<MenuType<ShopStockMenu>> SHOP_STOCK =
             MENUS.register("shop_stock", () -> IForgeMenuType.create(ShopStockMenu::new));
+
+    public static final RegistryObject<MenuType<ShopMerchantMenu>> SHOP_MERCHANT =
+            MENUS.register("shop_merchant", () -> new MenuType<>(
+                    (id, inv) -> new ShopMerchantMenu(id, inv), FeatureFlags.DEFAULT_FLAGS));
 
     public static void register(IEventBus bus) {
         MENUS.register(bus);

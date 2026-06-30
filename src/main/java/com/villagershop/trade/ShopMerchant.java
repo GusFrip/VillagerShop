@@ -76,6 +76,8 @@ public class ShopMerchant implements Merchant {
 
     @Override
     public void notifyTrade(MerchantOffer offer) {
+        // Comptabiliser la vente : l'offre se bloque quand maxUses (= stock à l'ouverture) est atteint.
+        offer.increaseUses();
         // Encaisser le paiement dans le stock
         be.depositToStock(offer.getCostA().copy());
         if (!offer.getCostB().isEmpty()) {
@@ -83,6 +85,11 @@ public class ShopMerchant implements Merchant {
         }
         // Retirer la marchandise du stock
         be.removeFromStock(offer.getResult(), offer.getResult().getCount());
+        // Son de vente (playTradeSound du menu est neutralisé pour éviter le crash)
+        if (be.getLevel() instanceof net.minecraft.server.level.ServerLevel sl) {
+            sl.playSound(null, be.getBlockPos(), getNotifyTradeSound(),
+                    net.minecraft.sounds.SoundSource.NEUTRAL, 1.0F, 1.0F);
+        }
     }
 
     @Override
@@ -117,6 +124,6 @@ public class ShopMerchant implements Merchant {
 
     @Override
     public boolean canRestock() {
-        return true;
+        return false; // stock physique : pas de réappro auto, rouvrir l'interface pour rafraîchir
     }
 }

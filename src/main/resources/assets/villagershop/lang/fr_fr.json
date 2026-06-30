@@ -44,7 +44,7 @@
   "book.villagershop.guide.e3.name": "Onglet Shop",
   "book.villagershop.guide.e3.p1": "$(l)Onglet Shop$() (livre) :$(br)- le $(o)nom du shop$()$(br)- les $(o)copropriétaires$() : tape un pseudo + Ajouter ; clique un nom pour le retirer.",
   "book.villagershop.guide.e4.name": "Onglet Trade",
-  "book.villagershop.guide.e4.p1": "$(l)Onglet Trade$() (émeraude) : 8 offres.$(br2)Chaque offre : pose le $(o)prix$() (case 1, + case 2 optionnelle) puis la $(o)marchandise$() (case résultat).",
+  "book.villagershop.guide.e4.p1": "$(l)Onglet Trade$() (émeraude) : 8 offres.$(br2)Chaque offre : pose le $(o)prix$() (case 1, + case 2 optionnelle) puis la $(o)marchandise$() (case résultat).$(br2)Laisse le prix vide pour donner l'objet $(l)gratuitement$() (toujours limité par le stock).",
   "book.villagershop.guide.e4.p2": "$(l)Clic gauche$() : pose un modèle (item non consommé).$(br)$(l)Clic droit$() : efface.$(br2)La quantité du modèle = la quantité de l'offre.",
   "book.villagershop.guide.e5.name": "Onglet Stock",
   "book.villagershop.guide.e5.p1": "$(l)Onglet Stock$() (coffre) : le stock contient la $(o)marchandise à vendre$() et les $(o)paiements$() reçus.$(br2)S'il est vide, l'offre est en rupture.$(br2)$(l:villagershop:6_upgrade#storage)Plus assez de place ? Agrandis-le avec l'upgrade de stock.$()",

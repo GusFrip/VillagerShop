@@ -60,7 +60,18 @@ public class VillagerInteractHandler {
 
         ShopMerchant merchant = new ShopMerchant(be);
         merchant.setTradingPlayer(player);
-        merchant.openTradingScreen((ServerPlayer) player, title, 0);
+        // Ouverture via notre menu marchand (playTradeSound neutralisé) pour éviter le
+        // crash/dupe au shift-clic. Côté client, Minecraft instancie le marchand vanilla.
+        ServerPlayer sp = (ServerPlayer) player;
+        java.util.OptionalInt cid = sp.openMenu(new net.minecraft.world.SimpleMenuProvider(
+                (id, inv, pl) -> new com.villagershop.menu.ShopMerchantMenu(id, inv, merchant), title));
+        if (cid.isPresent()) {
+            net.minecraft.world.item.trading.MerchantOffers offers = merchant.getOffers();
+            if (!offers.isEmpty()) {
+                sp.sendMerchantOffers(cid.getAsInt(), offers, 0,
+                        merchant.getVillagerXp(), merchant.showProgressBar(), merchant.canRestock());
+            }
+        }
     }
 
     @Nullable

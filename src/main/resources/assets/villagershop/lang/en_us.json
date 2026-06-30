@@ -44,7 +44,7 @@
   "book.villagershop.guide.e3.name": "Shop tab",
   "book.villagershop.guide.e3.p1": "$(l)Shop tab$() (book):$(br)- the $(o)shop name$()$(br)- the $(o)co-owners$(): type a name + Add; click a name to remove it.",
   "book.villagershop.guide.e4.name": "Trade tab",
-  "book.villagershop.guide.e4.p1": "$(l)Trade tab$() (emerald): 8 offers.$(br2)Each offer: set the $(o)price$() (slot 1, + optional slot 2) then the $(o)goods$() (result slot).",
+  "book.villagershop.guide.e4.p1": "$(l)Trade tab$() (emerald): 8 offers.$(br2)Each offer: set the $(o)price$() (slot 1, + optional slot 2) then the $(o)goods$() (result slot).$(br2)Leave the price empty to give the item away $(l)for free$() (still limited by stock).",
   "book.villagershop.guide.e4.p2": "$(l)Left-click$(): place a template (item not consumed).$(br)$(l)Right-click$(): clear.$(br2)The template stack size = the offer quantity.",
   "book.villagershop.guide.e5.name": "Stock tab",
   "book.villagershop.guide.e5.p1": "$(l)Stock tab$() (chest): the storage holds the $(o)goods to sell$() and the $(o)payments$() received.$(br2)If empty, the offer is out of stock.$(br2)$(l:villagershop:6_upgrade#storage)Running low on space? Expand it with the Storage upgrade.$()",

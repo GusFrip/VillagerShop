@@ -30,13 +30,14 @@ public class ShopOffer {
     public void setPriceB(ItemStack s) { this.priceB = s == null ? ItemStack.EMPTY : s; }
     public void setResult(ItemStack s) { this.result = s == null ? ItemStack.EMPTY : s; }
 
-    /** Une offre est valide si elle a au moins un prix et une marchandise. */
+    /** Vide = aucun des trois items. */
     public boolean isEmpty() {
         return priceA.isEmpty() && priceB.isEmpty() && result.isEmpty();
     }
 
     public boolean isValid() {
-        return !result.isEmpty() && (!priceA.isEmpty() || !priceB.isEmpty());
+        // Marchandise seule suffit : prix optionnel (offre gratuite, geree par ShopMerchantMenu).
+        return !result.isEmpty();
     }
 
     public CompoundTag save() {

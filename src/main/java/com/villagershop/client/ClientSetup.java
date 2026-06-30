@@ -3,6 +3,7 @@ package com.villagershop.client;
 import com.villagershop.ShopMod;
 import com.villagershop.registry.ModMenus;
 import net.minecraft.client.gui.screens.MenuScreens;
+import net.minecraft.client.gui.screens.inventory.MerchantScreen;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.world.entity.EntityType;
@@ -29,6 +30,7 @@ public class ClientSetup {
             MenuScreens.register(ModMenus.SHOP_CONFIG.get(), ShopConfigScreen::new);
             MenuScreens.register(ModMenus.SHOP_TRADE.get(), ShopTradeScreen::new);
             MenuScreens.register(ModMenus.SHOP_STOCK.get(), ShopStockScreen::new);
+            MenuScreens.register(ModMenus.SHOP_MERCHANT.get(), MerchantScreen::new);
         });
     }
 }
