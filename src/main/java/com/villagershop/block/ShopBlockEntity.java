@@ -114,10 +114,21 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         }
     };
 
-    private final ItemStackHandler saveSlot = new ItemStackHandler(1) {
+    private final ItemStackHandler saveSlot = new ItemStackHandler(2) {
         @Override public int getSlotLimit(int slot) { return 1; }
-        @Override public boolean isItemValid(int slot, @NotNull ItemStack stack) { return stack.is(Items.WRITABLE_BOOK); }
+        @Override public boolean isItemValid(int slot, @NotNull ItemStack stack) {
+            return slot == 0 ? stack.is(Items.WRITABLE_BOOK) : stack.is(Items.WRITTEN_BOOK);
+        }
         @Override protected void onContentsChanged(int slot) { setChanged(); }
+        @Override public void deserializeNBT(CompoundTag nbt) {
+            setSize(2); // ignore un éventuel Size=1 d'anciennes sauvegardes dev
+            ListTag items = nbt.getList("Items", Tag.TAG_COMPOUND);
+            for (int i = 0; i < items.size(); i++) {
+                CompoundTag it = items.getCompound(i);
+                int slot = it.getInt("Slot");
+                if (slot >= 0 && slot < 2) setStackInSlot(slot, ItemStack.of(it));
+            }
+        }
     };
 
     public ItemStackHandler getSaveSlot() { return saveSlot; }
@@ -188,24 +199,75 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         setChanged();
     }
 
-    /** Écrit la config dans le livre & plume présent dans le slot de sauvegarde. */
-    public boolean writeConfigToSaveBook() {
-        ItemStack book = saveSlot.getStackInSlot(0);
-        if (!book.is(Items.WRITABLE_BOOK)) return false;
-        CompoundTag tag = book.getOrCreateTag();
-        tag.put("ShopConfig", exportConfig());
-        book.setHoverName(net.minecraft.network.chat.Component.translatable("item.villagershop.save_book", getShopNameOrDefault()));
-        saveSlot.setStackInSlot(0, book);
-        setChanged();
-        return true;
+    private static final String PAGE_MARKER = "VILLAGERSHOP:";
+
+    private static String pageJson(String text) {
+        return net.minecraft.network.chat.Component.Serializer.toJson(net.minecraft.network.chat.Component.literal(text));
     }
 
-    /** Lit la config depuis le livre du slot de sauvegarde et l'applique. */
-    public boolean readConfigFromSaveBook() {
-        ItemStack book = saveSlot.getStackInSlot(0);
-        if (book.isEmpty() || !book.hasTag() || !book.getTag().contains("ShopConfig")) return false;
-        importConfig(book.getTag().getCompound("ShopConfig"));
-        return true;
+    private static String pageText(String raw) {
+        try {
+            net.minecraft.network.chat.Component c = net.minecraft.network.chat.Component.Serializer.fromJson(raw);
+            if (c != null) return c.getString();
+        } catch (Exception ignored) {}
+        return raw;
+    }
+
+    /** Construit un LIVRE SIGNÉ unique contenant la config (tag rapide + page = survit à la copie vanilla). */
+    private ItemStack buildSignedBook() {
+        CompoundTag cfg = exportConfig();
+        ItemStack book = new ItemStack(Items.WRITTEN_BOOK);
+        CompoundTag tag = book.getOrCreateTag();
+        tag.put("ShopConfig", cfg);
+        String title = "Save: " + getShopNameOrDefault();
+        if (title.length() > 32) title = title.substring(0, 32);
+        tag.putString("title", title);
+        tag.putString("author", getShopNameOrDefault());
+        tag.putInt("generation", 0);
+        net.minecraft.nbt.ListTag pages = new net.minecraft.nbt.ListTag();
+        pages.add(net.minecraft.nbt.StringTag.valueOf(pageJson(
+                "VillagerShop — " + getShopNameOrDefault() + "\n\nLivre de sauvegarde.\nDépose-le dans le slot livre signé d'un comptoir (upgrade mémoire) puis clique Save / Load.")));
+        pages.add(net.minecraft.nbt.StringTag.valueOf(pageJson(PAGE_MARKER + cfg.toString())));
+        tag.put("pages", pages);
+        return book;
+    }
+
+    /** Lit la config depuis un livre signé : tag direct, sinon depuis les pages (copie). */
+    private boolean readConfigFrom(ItemStack book) {
+        if (book.isEmpty() || !book.hasTag()) return false;
+        CompoundTag t = book.getTag();
+        if (t.contains("ShopConfig")) { importConfig(t.getCompound("ShopConfig")); return true; }
+        if (t.contains("pages")) {
+            net.minecraft.nbt.ListTag pages = t.getList("pages", Tag.TAG_STRING);
+            for (int i = 0; i < pages.size(); i++) {
+                String text = pageText(pages.getString(i));
+                int idx = text.indexOf(PAGE_MARKER);
+                if (idx >= 0) {
+                    try {
+                        importConfig(net.minecraft.nbt.TagParser.parseTag(text.substring(idx + PAGE_MARKER.length())));
+                        return true;
+                    } catch (Exception e) { return false; }
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Bouton unique : exporte (livre & plume -> livre signé dans le 2e slot) ou importe (livre signé). */
+    public String doSaveAction() {
+        ItemStack quill = saveSlot.getStackInSlot(0);
+        ItemStack signed = saveSlot.getStackInSlot(1);
+        if (quill.is(Items.WRITABLE_BOOK)) {
+            if (!signed.isEmpty()) return "message.villagershop.save_slot_busy";
+            saveSlot.setStackInSlot(1, buildSignedBook());
+            saveSlot.setStackInSlot(0, ItemStack.EMPTY);
+            setChanged();
+            return "message.villagershop.export_ok";
+        }
+        if (signed.is(Items.WRITTEN_BOOK)) {
+            return readConfigFrom(signed) ? "message.villagershop.import_ok" : "message.villagershop.import_fail";
+        }
+        return "message.villagershop.save_empty";
     }
 
     // Drapeaux anti-spam (non persistés) : état "déjà notifié" par type de blocage.
@@ -605,11 +667,11 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
     /** Lâche tout (stock + coffres installés) quand le bloc est cassé. */
     public void dropContents() {
         if (level == null) return;
-        SimpleContainer c = new SimpleContainer(MAX_STORAGE + 2 + upgrades.getSlots());
+        SimpleContainer c = new SimpleContainer(MAX_STORAGE + 1 + upgrades.getSlots() + saveSlot.getSlots());
         for (int i = 0; i < MAX_STORAGE; i++) c.setItem(i, storage.getStackInSlot(i));
         c.setItem(MAX_STORAGE, chestUpgrade.getStackInSlot(0));
         for (int i = 0; i < upgrades.getSlots(); i++) c.setItem(MAX_STORAGE + 1 + i, upgrades.getStackInSlot(i));
-        c.setItem(MAX_STORAGE + 1 + upgrades.getSlots(), saveSlot.getStackInSlot(0));
+        for (int i = 0; i < saveSlot.getSlots(); i++) c.setItem(MAX_STORAGE + 1 + upgrades.getSlots() + i, saveSlot.getStackInSlot(i));
         Containers.dropContents(level, getBlockPos(), c);
     }
 

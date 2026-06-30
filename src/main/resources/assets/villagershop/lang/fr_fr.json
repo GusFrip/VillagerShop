@@ -58,7 +58,7 @@
   "message.villagershop.no_supply": "Ta boutique « %s » n'a plus de marchandise — une vente est bloquée en %s %s %s.",
   "message.villagershop.no_stock": "Le stock de ta boutique « %s » est plein — paiement impossible, une vente est bloquée en %s %s %s.",
   "book.villagershop.guide.e6.p4": "$(l)Upgrade de stock$() — $(item)Coffre$() :$(br2)le comptoir de base contient $(o)3$() emplacements. Chaque coffre ajoute $(o)+27$(), jusqu'à $(o)8 coffres = 216$(). Fais défiler la liste du stock pour tout voir.",
-  "book.villagershop.guide.e6.p5": "$(l)Upgrade de communication$() — $(item)Paratonnerre$() :$(br2)le proprio et les co-proprios sont prévenus quand une vente est $(l)bloquée$() (plus de marchandise, ou stock plein) et quand le marchand $(l)meurt$().$(br)En ligne : tout de suite ; sinon à la prochaine connexion, si encore d'actualité.",
+  "book.villagershop.guide.e6.p5": "$(l)Upgrade de communication$() — $(item)Paratonnerre$() :$(br2)le proprio et les co-proprios sont prévenus quand une vente est $(l)bloquée$() (plus de marchandise, ou stock plein) et quand le marchand $(l)meurt$().$(br)En ligne : tout de suite ; sinon à la prochaine connexion, si encore d'actualité.$(br)Il ajoute aussi un bouton $(l)Localiser le marchand$() (cet onglet) qui affiche les coordonnées du villageois.",
   "gui.villagershop.locate": "Localiser le marchand",
   "message.villagershop.villager_at": "Le marchand de « %s » est en %s %s %s.",
   "message.villagershop.villager_missing": "Aucun marchand n'est actuellement assigné à ce comptoir.",
@@ -73,5 +73,8 @@
   "message.villagershop.import_ok": "Config importée. Rouvre l'interface pour rafraîchir l'affichage.",
   "message.villagershop.import_fail": "Aucune config sauvegardée dans ce livre.",
   "item.villagershop.save_book": "Sauvegarde VillagerShop : %s",
-  "book.villagershop.guide.e6.p7": "$(l)Upgrade de mémoire$() — $(item)Bibliothèque$() :$(br2)débloque le module Sauvegarde (bas de cet onglet). Mets un $(item)Livre & plume$() dans le slot, puis $(l)Exporter$() pour y copier la config du shop, ou $(l)Importer$() pour appliquer un livre sauvegardé à ce comptoir."
+  "book.villagershop.guide.e6.p7": "$(l)Upgrade de mémoire$() — $(item)Bibliothèque$() :$(br2)débloque le module Sauvegarde : une case $(item)Livre & plume$(), une case $(item)Livre signé$() et un bouton.$(br)Livre & plume présent → exporte un livre $(l)signé$() dans la 2e case. Livre signé présent → importe sa config.$(br)Le livre signé est $(l)copiable$() en table de craft ; les copies gardent les données.",
+  "gui.villagershop.save_action": "Save / Load",
+  "message.villagershop.save_slot_busy": "Vide d'abord la case du livre signé.",
+  "message.villagershop.save_empty": "Mets un Livre & plume pour exporter, ou un livre signé pour importer."
 }

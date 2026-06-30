@@ -58,7 +58,7 @@
   "message.villagershop.no_supply": "Your shop '%s' is out of goods — a sale is blocked at %s %s %s.",
   "message.villagershop.no_stock": "Your shop '%s' storage is full — can't take payment, a sale is blocked at %s %s %s.",
   "book.villagershop.guide.e6.p4": "$(l)Storage upgrade$() — $(item)Chest$():$(br2)the base counter holds $(o)3$() slots. Each chest adds $(o)+27$(), up to $(o)8 chests = 216$() slots. Scroll the stock list to see them all.",
-  "book.villagershop.guide.e6.p5": "$(l)Communication upgrade$() — $(item)Lightning Rod$():$(br2)the owner and co-owners are notified when a sale is $(l)blocked$() (out of goods, or storage full) and when the merchant $(l)dies$().$(br)Online players get it at once; others on their next login, if still relevant.",
+  "book.villagershop.guide.e6.p5": "$(l)Communication upgrade$() — $(item)Lightning Rod$():$(br2)the owner and co-owners are notified when a sale is $(l)blocked$() (out of goods, or storage full) and when the merchant $(l)dies$().$(br)Online players get it at once; others on their next login, if still relevant.$(br)It also adds a $(l)Locate merchant$() button (this tab) that shows the villager's coordinates.",
   "gui.villagershop.locate": "Locate merchant",
   "message.villagershop.villager_at": "Merchant of '%s' is at %s %s %s.",
   "message.villagershop.villager_missing": "No merchant is currently assigned to this counter.",
@@ -73,5 +73,8 @@
   "message.villagershop.import_ok": "Shop config imported. Reopen to refresh the view.",
   "message.villagershop.import_fail": "No saved config found in that book.",
   "item.villagershop.save_book": "VillagerShop Save: %s",
-  "book.villagershop.guide.e6.p7": "$(l)Memory upgrade$() — $(item)Bookshelf$():$(br2)unlocks the Save module (bottom of this tab). Put a $(item)Book and Quill$() in the slot, then $(l)Export$() to copy the shop config into it, or $(l)Import$() to apply a saved book to this counter."
+  "book.villagershop.guide.e6.p7": "$(l)Memory upgrade$() — $(item)Bookshelf$():$(br2)unlocks the Save module: a $(item)Book and Quill$() slot, a $(item)Written Book$() slot and one button.$(br)Quill present → exports a $(l)signed$() save book into the second slot. Signed book present → imports its config.$(br)The signed book is $(l)copyable$() in a crafting table; copies keep the data.",
+  "gui.villagershop.save_action": "Save / Load",
+  "message.villagershop.save_slot_busy": "Empty the signed-book slot first.",
+  "message.villagershop.save_empty": "Put a Book and Quill to export, or a signed save book to import."
 }

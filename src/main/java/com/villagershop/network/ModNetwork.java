@@ -35,10 +35,8 @@ public class ModNetwork {
                 OpenSubScreenPacket::encode, OpenSubScreenPacket::decode, OpenSubScreenPacket::handle);
         CHANNEL.registerMessage(id++, LocateVillagerPacket.class,
                 LocateVillagerPacket::encode, LocateVillagerPacket::decode, LocateVillagerPacket::handle);
-        CHANNEL.registerMessage(id++, ExportConfigPacket.class,
-                ExportConfigPacket::encode, ExportConfigPacket::decode, ExportConfigPacket::handle);
-        CHANNEL.registerMessage(id++, ImportConfigPacket.class,
-                ImportConfigPacket::encode, ImportConfigPacket::decode, ImportConfigPacket::handle);
+        CHANNEL.registerMessage(id++, SaveActionPacket.class,
+                SaveActionPacket::encode, SaveActionPacket::decode, SaveActionPacket::handle);
     }
 
     public static void sendToServer(Object msg) {

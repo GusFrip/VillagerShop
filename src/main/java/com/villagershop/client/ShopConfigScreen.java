@@ -8,8 +8,7 @@ import com.villagershop.menu.ShopConfigMenu;
 import com.villagershop.menu.ToggleGhostSlot;
 import com.villagershop.menu.UpgradeSlot;
 import com.villagershop.network.LocateVillagerPacket;
-import com.villagershop.network.ExportConfigPacket;
-import com.villagershop.network.ImportConfigPacket;
+import com.villagershop.network.SaveActionPacket;
 import com.villagershop.network.ManageAllowedPacket;
 import com.villagershop.network.ModNetwork;
 import com.villagershop.network.RequestAllowedPacket;
@@ -51,7 +50,7 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
     private int currentTab = TAB_SHOP;
 
     private EditBox shopNameField, coownerField;
-    private Button addCoownerBtn, locateBtn, exportBtn, importBtn;
+    private Button addCoownerBtn, locateBtn, saveBtn;
     private String savedShopName = null, savedCoowner = "";
 
     private List<String> coownerNames = new ArrayList<>();
@@ -91,12 +90,9 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
                         b -> ModNetwork.sendToServer(new LocateVillagerPacket(menu.getPos())))
                 .bounds(leftPos + 8, topPos + 60, 160, 16).build());
 
-        exportBtn = addRenderableWidget(Button.builder(Component.translatable("gui.villagershop.export"),
-                        b -> ModNetwork.sendToServer(new ExportConfigPacket(menu.getPos())))
-                .bounds(leftPos + 28, topPos + 90, 54, 16).build());
-        importBtn = addRenderableWidget(Button.builder(Component.translatable("gui.villagershop.import_"),
-                        b -> ModNetwork.sendToServer(new ImportConfigPacket(menu.getPos())))
-                .bounds(leftPos + 86, topPos + 90, 54, 16).build());
+        saveBtn = addRenderableWidget(Button.builder(Component.translatable("gui.villagershop.save_action"),
+                        b -> ModNetwork.sendToServer(new SaveActionPacket(menu.getPos())))
+                .bounds(leftPos + 54, topPos + 90, 98, 16).build());
 
         setActiveTab(currentTab);
         ModNetwork.sendToServer(new RequestAllowedPacket(menu.getPos()));
@@ -161,9 +157,9 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         if (coownerField != null)  coownerField.visible = access;
         if (addCoownerBtn != null) addCoownerBtn.visible = access;
         boolean save = (currentTab == TAB_UPGRADE) && hasMemoryClient();
-        if (exportBtn != null) exportBtn.visible = save;
-        if (importBtn != null) importBtn.visible = save;
-        ((UpgradeSlot) menu.slots.get(ShopConfigMenu.SAVE_SLOT_INDEX)).setVisible(save);
+        if (saveBtn != null) saveBtn.visible = save;
+        ((UpgradeSlot) menu.slots.get(ShopConfigMenu.SAVE_QUILL_INDEX)).setVisible(save);
+        ((UpgradeSlot) menu.slots.get(ShopConfigMenu.SAVE_SIGNED_INDEX)).setVisible(save);
     }
 
     @Override
@@ -289,9 +285,14 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
 
     private void renderGhostSave(GuiGraphics gg) {
         if (!hasMemoryClient()) return;
-        if (menu.slots.get(ShopConfigMenu.SAVE_SLOT_INDEX).hasItem()) return;
-        int x = leftPos + ShopConfigMenu.SAVE_SLOT_X, y = topPos + ShopConfigMenu.SAVE_SLOT_Y;
-        gg.renderItem(new ItemStack(Items.WRITABLE_BOOK), x, y);
+        if (!menu.slots.get(ShopConfigMenu.SAVE_QUILL_INDEX).hasItem())
+            ghostIcon(gg, new ItemStack(Items.WRITABLE_BOOK), leftPos + ShopConfigMenu.SAVE_QUILL_X, topPos + ShopConfigMenu.SAVE_Y);
+        if (!menu.slots.get(ShopConfigMenu.SAVE_SIGNED_INDEX).hasItem())
+            ghostIcon(gg, new ItemStack(Items.WRITTEN_BOOK), leftPos + ShopConfigMenu.SAVE_SIGNED_X, topPos + ShopConfigMenu.SAVE_Y);
+    }
+
+    private void ghostIcon(GuiGraphics gg, ItemStack icon, int x, int y) {
+        gg.renderItem(icon, x, y);
         gg.pose().pushPose();
         gg.pose().translate(0, 0, 200);
         gg.fill(x, y, x + 16, y + 16, 0xAAC6C6C6);

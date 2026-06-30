@@ -37,8 +37,9 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     public static final int STORAGE_END = STORAGE_START + STORAGE_VISIBLE; // 52
     public static final int UPGRADE_START = STORAGE_END;            // 43 (3 slots)
     public static final int UPGRADE_COUNT = 5;
-    public static final int SAVE_SLOT_INDEX = UPGRADE_START + UPGRADE_COUNT;
-    public static final int INV_START = SAVE_SLOT_INDEX + 1;
+    public static final int SAVE_QUILL_INDEX = UPGRADE_START + UPGRADE_COUNT;
+    public static final int SAVE_SIGNED_INDEX = SAVE_QUILL_INDEX + 1;
+    public static final int INV_START = SAVE_SIGNED_INDEX + 1;
     public static final int INV_END = INV_START + 36;               // 82
 
     // Grille d'offres : 2 colonnes de 4
@@ -50,7 +51,7 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     public static final int CHEST_SLOT_X = 137, CHEST_SLOT_Y = 40;
     public static final int[] UPGRADE_XS = {37, 57, 77, 97, 117}; // immortalité, déplacement, communication, mémoire, accès (coffre à 137)
     public static final int[] UPGRADE_YS = {40, 40, 40, 40, 40};
-    public static final int SAVE_SLOT_X = 8, SAVE_SLOT_Y = 90;
+    public static final int SAVE_QUILL_X = 8, SAVE_SIGNED_X = 30, SAVE_Y = 90;
     public static final int STORAGE_X = 8, STORAGE_Y = 62;
     public static final int PLAYER_INV_X = 8, PLAYER_INV_Y = 138;
 
@@ -66,7 +67,7 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     /** Constructeur CLIENT. */
     public ShopConfigMenu(int id, Inventory inv, FriendlyByteBuf buf) {
         this(id, inv, null, buf.readBlockPos(), buf.readUtf(), new SimpleContainer(GHOST_SLOTS),
-                new ItemStackHandler(ShopBlockEntity.MAX_STORAGE), new ItemStackHandler(1), new ItemStackHandler(5), new ItemStackHandler(1));
+                new ItemStackHandler(ShopBlockEntity.MAX_STORAGE), new ItemStackHandler(1), new ItemStackHandler(5), new ItemStackHandler(2));
     }
 
     /** Constructeur SERVEUR. */
@@ -109,7 +110,8 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
             addSlot(new UpgradeSlot(upgradeHandler, i, UPGRADE_XS[i], UPGRADE_YS[i]));
         }
         // slot de sauvegarde (livre & plume), onglet Upgrade
-        addSlot(new UpgradeSlot(saveHandler, 0, SAVE_SLOT_X, SAVE_SLOT_Y));
+        addSlot(new UpgradeSlot(saveHandler, 0, SAVE_QUILL_X, SAVE_Y));
+        addSlot(new UpgradeSlot(saveHandler, 1, SAVE_SIGNED_X, SAVE_Y));
 
         // inventaire
         for (int row = 0; row < 3; row++) {
@@ -198,13 +200,14 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
         if (slot == null || !slot.hasItem() || isGhost(index)) return ItemStack.EMPTY;
         ItemStack stack = slot.getItem();
         ItemStack result = stack.copy();
-        if (index == CHEST_SLOT_INDEX || index == SAVE_SLOT_INDEX || (index >= STORAGE_START && index < STORAGE_END)
+        if (index == CHEST_SLOT_INDEX || index == SAVE_QUILL_INDEX || index == SAVE_SIGNED_INDEX || (index >= STORAGE_START && index < STORAGE_END)
                 || (index >= UPGRADE_START && index < UPGRADE_START + UPGRADE_COUNT)) {
             if (!moveItemStackTo(stack, INV_START, INV_END, true)) return ItemStack.EMPTY;
         } else {
             boolean moved = false;
             if (stack.is(Items.CHEST)) moved = moveItemStackTo(stack, CHEST_SLOT_INDEX, CHEST_SLOT_INDEX + 1, false);
-            if (!stack.isEmpty() && stack.is(Items.WRITABLE_BOOK)) moved = moveItemStackTo(stack, SAVE_SLOT_INDEX, SAVE_SLOT_INDEX + 1, false) || moved;
+            if (!stack.isEmpty() && stack.is(Items.WRITABLE_BOOK)) moved = moveItemStackTo(stack, SAVE_QUILL_INDEX, SAVE_QUILL_INDEX + 1, false) || moved;
+            if (!stack.isEmpty() && stack.is(Items.WRITTEN_BOOK)) moved = moveItemStackTo(stack, SAVE_SIGNED_INDEX, SAVE_SIGNED_INDEX + 1, false) || moved;
             if (!stack.isEmpty()) moved = moveItemStackTo(stack, UPGRADE_START, UPGRADE_START + UPGRADE_COUNT, false) || moved;
             if (!stack.isEmpty()) moved = moveItemStackTo(stack, STORAGE_START, STORAGE_END, false) || moved;
             if (!moved) return ItemStack.EMPTY;
