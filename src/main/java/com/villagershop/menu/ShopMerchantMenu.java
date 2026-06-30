@@ -156,6 +156,12 @@ public class ShopMerchantMenu extends MerchantMenu {
         }
         // rafraichir l'affichage du resultat
         setResultDirect(offer.isOutOfStock() ? ItemStack.EMPTY : offer.assemble());
+        // Re-synchronise les offres au client : sinon son etat (usages/rupture) reste fige
+        // -> la fleche ne passe pas rouge et le resultat reste affiche a tort.
+        if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
+            sp.sendMerchantOffers(this.containerId, this.getOffers(), 0,
+                    shopMerchant.getVillagerXp(), shopMerchant.showProgressBar(), shopMerchant.canRestock());
+        }
         this.broadcastChanges();
     }
 
