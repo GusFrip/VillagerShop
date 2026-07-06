@@ -369,7 +369,7 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         if (max <= 0) return; // pas de scroller si rien à faire défiler
         gg.fill(x, y, x + 14, y + trackH, 0xFF373737);
         int knobY = (max == 0) ? y : y + (int) ((trackH - 15) * (scroll / (double) max));
-        gg.blit(VANILLA_TABS, x + 1, knobY, 232, 0, 12, 15);
+        gg.fill(x + 1, knobY, x + 13, knobY + 15, 0xFFC6C6C6);
     }
 
     private void drawItem(GuiGraphics gg, ItemStack stack, int x, int y) {
