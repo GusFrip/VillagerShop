@@ -1,0 +1,12 @@
+{
+  "name": "book.villagershop.guide.e3.name",
+  "icon": "minecraft:book",
+  "category": "villagershop:main",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e3.p1"
+    }
+  ]
+}

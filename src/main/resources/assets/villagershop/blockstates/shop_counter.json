@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "villagershop:block/shop_counter" },
+    "facing=east":  { "model": "villagershop:block/shop_counter", "y": 90 },
+    "facing=south": { "model": "villagershop:block/shop_counter", "y": 180 },
+    "facing=west":  { "model": "villagershop:block/shop_counter", "y": 270 }
+  }
+}
