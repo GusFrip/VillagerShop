@@ -76,7 +76,26 @@ public class ShopStockScreen extends AbstractContainerScreen<ShopStockMenu> {
         renderBackground(gg);
         super.render(gg, mouseX, mouseY, partialTick);
         renderScrollbar(gg);
+        renderLockedStock(gg, mouseX, mouseY);
         renderTooltip(gg, mouseX, mouseY);
+    }
+
+    /** Voile sur les emplacements de stock verrouillés (coffres manquants). */
+    private void renderLockedStock(GuiGraphics gg, int mouseX, int mouseY) {
+        Component tip = null;
+        int cap = menu.getActiveCapacity();
+        for (int row = 0; row < ShopStockMenu.VISIBLE_ROWS; row++) {
+            for (int col = 0; col < 9; col++) {
+                int idx = (menu.getScrollOffset() + row) * 9 + col;
+                if (idx < cap) continue;
+                int x = leftPos + ShopStockMenu.STORAGE_X + col * 18;
+                int y = topPos + ShopStockMenu.STORAGE_Y + row * 18;
+                gg.fill(x - 1, y - 1, x + 17, y + 17, 0x55313131);
+                if (mouseX >= x - 1 && mouseX < x + 17 && mouseY >= y - 1 && mouseY < y + 17)
+                    tip = Component.translatable("gui.villagershop.locked_stock");
+            }
+        }
+        if (tip != null) gg.renderTooltip(font, tip, mouseX, mouseY);
     }
 
     private void renderScrollbar(GuiGraphics gg) {

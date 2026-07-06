@@ -36,10 +36,11 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     public static final int STORAGE_VISIBLE = VISIBLE_ROWS * 9;     // 27
     public static final int STORAGE_END = STORAGE_START + STORAGE_VISIBLE; // 52
     public static final int UPGRADE_START = STORAGE_END;            // 43 (3 slots)
-    public static final int UPGRADE_COUNT = 5;
+    public static final int UPGRADE_COUNT = 6;
     public static final int SAVE_QUILL_INDEX = UPGRADE_START + UPGRADE_COUNT;
     public static final int SAVE_SIGNED_INDEX = SAVE_QUILL_INDEX + 1;
-    public static final int INV_START = SAVE_SIGNED_INDEX + 1;
+    public static final int TRADE_SLOT_INDEX = SAVE_SIGNED_INDEX + 1;
+    public static final int INV_START = TRADE_SLOT_INDEX + 1;
     public static final int INV_END = INV_START + 36;               // 82
 
     // Grille d'offres : 2 colonnes de 4
@@ -48,9 +49,11 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     public static final int COL0_X = 0, COL1_X = 90;
     public static final int OFF_PRICE_A_DX = 8, OFF_PRICE_B_DX = 30, OFF_RESULT_DX = 62;
 
-    public static final int CHEST_SLOT_X = 137, CHEST_SLOT_Y = 40;
-    public static final int[] UPGRADE_XS = {37, 57, 77, 97, 117}; // immortalité, déplacement, communication, mémoire, accès (coffre à 137)
-    public static final int[] UPGRADE_YS = {40, 40, 40, 40, 40};
+    public static final int CHEST_SLOT_X = 134, CHEST_SLOT_Y = 40;
+    public static final int TRADE_SLOT_X = 8, TRADE_SLOT_Y = 40;
+    // rangée de 8 slots (pas de 18) : émeraude(8), 6 upgrades, coffre(134)
+    public static final int[] UPGRADE_XS = {26, 44, 62, 80, 98, 116}; // immortalité, déplacement, communication, mémoire, accès, anti-explosion
+    public static final int[] UPGRADE_YS = {40, 40, 40, 40, 40, 40};
     public static final int SAVE_QUILL_X = 8, SAVE_SIGNED_X = 30, SAVE_Y = 90;
     public static final int STORAGE_X = 8, STORAGE_Y = 62;
     public static final int PLAYER_INV_X = 8, PLAYER_INV_Y = 138;
@@ -60,6 +63,7 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     private final Container templates;
     private final IItemHandler chestHandler;
     private final IItemHandler upgradeHandler;
+    private final IItemHandler tradeHandler;
     private final BlockPos pos;
     private final String shopName;
     private int scrollOffset = 0;
@@ -67,16 +71,16 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     /** Constructeur CLIENT. */
     public ShopConfigMenu(int id, Inventory inv, FriendlyByteBuf buf) {
         this(id, inv, null, buf.readBlockPos(), buf.readUtf(), new SimpleContainer(GHOST_SLOTS),
-                new ItemStackHandler(ShopBlockEntity.MAX_STORAGE), new ItemStackHandler(1), new ItemStackHandler(5), new ItemStackHandler(2));
+                new ItemStackHandler(ShopBlockEntity.MAX_STORAGE), new ItemStackHandler(1), new ItemStackHandler(6), new ItemStackHandler(2), new ItemStackHandler(1));
     }
 
     /** Constructeur SERVEUR. */
     public ShopConfigMenu(int id, Inventory inv, ShopBlockEntity be) {
-        this(id, inv, be, be.getBlockPos(), be.getShopName(), buildTemplatesFrom(be), be.getStorage(), be.getChestUpgrade(), be.getUpgrades(), be.getSaveSlot());
+        this(id, inv, be, be.getBlockPos(), be.getShopName(), buildTemplatesFrom(be), be.getStorage(), be.getChestUpgrade(), be.getUpgrades(), be.getSaveSlot(), be.getTradeUpgrade());
     }
 
     private ShopConfigMenu(int id, Inventory inv, @Nullable ShopBlockEntity be, BlockPos pos, String shopName,
-                           Container templates, IItemHandlerModifiable storage, IItemHandler chestHandler, IItemHandler upgradeHandler, IItemHandler saveHandler) {
+                           Container templates, IItemHandlerModifiable storage, IItemHandler chestHandler, IItemHandler upgradeHandler, IItemHandler saveHandler, IItemHandler tradeHandler) {
         super(ModMenus.SHOP_CONFIG.get(), id);
         this.be = be;
         this.pos = pos;
@@ -84,6 +88,7 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
         this.templates = templates;
         this.chestHandler = chestHandler;
         this.upgradeHandler = upgradeHandler;
+        this.tradeHandler = tradeHandler;
 
         // 8 offres : prixA, prixB, résultat
         for (int i = 0; i < OFFERS; i++) {
@@ -113,6 +118,9 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
         addSlot(new UpgradeSlot(saveHandler, 0, SAVE_QUILL_X, SAVE_Y));
         addSlot(new UpgradeSlot(saveHandler, 1, SAVE_SIGNED_X, SAVE_Y));
 
+        // blocs d'émeraude : débloquent les offres (1 de base + 1 par bloc)
+        addSlot(new TradeUpgradeSlot(tradeHandler, 0, TRADE_SLOT_X, TRADE_SLOT_Y));
+
         // inventaire
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
@@ -139,6 +147,12 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
 
     public int getChestCount() {
         return Math.min(ShopBlockEntity.MAX_CHESTS, chestHandler.getStackInSlot(0).getCount());
+    }
+
+    /** Nombre d'offres actives (1 + blocs d'émeraude), calculable côté client via le slot. */
+    public int getTradeCount() {
+        return Math.min(ShopBlockEntity.MAX_OFFERS,
+                1 + Math.min(ShopBlockEntity.MAX_OFFERS - 1, tradeHandler.getStackInSlot(0).getCount()));
     }
 
     @Override
@@ -184,6 +198,20 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
         super.clicked(slotId, dragType, clickType, player);
     }
 
+
+    /** Recharge les slots d'offres depuis le BE (après un import de sauvegarde),
+     *  sinon le menu ouvert garde ses modèles périmés et les écrase au prochain clic. */
+    public void reloadTemplatesFromBE() {
+        if (be == null) return;
+        for (int i = 0; i < OFFERS; i++) {
+            ShopOffer o = be.getOffer(i);
+            templates.setItem(i * 3, o.getPriceA().copy());
+            templates.setItem(i * 3 + 1, o.getPriceB().copy());
+            templates.setItem(i * 3 + 2, o.getResult().copy());
+        }
+        broadcastChanges();
+    }
+
     private void pushTemplatesToBE() {
         if (be == null) return;
         for (int i = 0; i < OFFERS; i++) {
@@ -200,7 +228,7 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
         if (slot == null || !slot.hasItem() || isGhost(index)) return ItemStack.EMPTY;
         ItemStack stack = slot.getItem();
         ItemStack result = stack.copy();
-        if (index == CHEST_SLOT_INDEX || index == SAVE_QUILL_INDEX || index == SAVE_SIGNED_INDEX || (index >= STORAGE_START && index < STORAGE_END)
+        if (index == CHEST_SLOT_INDEX || index == SAVE_QUILL_INDEX || index == SAVE_SIGNED_INDEX || index == TRADE_SLOT_INDEX || (index >= STORAGE_START && index < STORAGE_END)
                 || (index >= UPGRADE_START && index < UPGRADE_START + UPGRADE_COUNT)) {
             if (!moveItemStackTo(stack, INV_START, INV_END, true)) return ItemStack.EMPTY;
         } else {
@@ -208,6 +236,7 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
             if (stack.is(Items.CHEST)) moved = moveItemStackTo(stack, CHEST_SLOT_INDEX, CHEST_SLOT_INDEX + 1, false);
             if (!stack.isEmpty() && stack.is(Items.WRITABLE_BOOK)) moved = moveItemStackTo(stack, SAVE_QUILL_INDEX, SAVE_QUILL_INDEX + 1, false) || moved;
             if (!stack.isEmpty() && stack.is(Items.WRITTEN_BOOK)) moved = moveItemStackTo(stack, SAVE_SIGNED_INDEX, SAVE_SIGNED_INDEX + 1, false) || moved;
+            if (!stack.isEmpty() && stack.is(Items.EMERALD_BLOCK)) moved = moveItemStackTo(stack, TRADE_SLOT_INDEX, TRADE_SLOT_INDEX + 1, false) || moved;
             if (!stack.isEmpty()) moved = moveItemStackTo(stack, UPGRADE_START, UPGRADE_START + UPGRADE_COUNT, false) || moved;
             if (!stack.isEmpty()) moved = moveItemStackTo(stack, STORAGE_START, STORAGE_END, false) || moved;
             if (!moved) return ItemStack.EMPTY;

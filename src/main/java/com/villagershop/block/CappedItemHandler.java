@@ -6,9 +6,10 @@ import net.minecraftforge.items.ItemStackHandler;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Vue capability du stock qui ne révèle que les emplacements actifs (selon le
- * nombre de coffres installés). Empêche hoppers/tuyaux de remplir au-delà de la
- * capacité réelle.
+ * EN SOMMEIL (non enregistré) : vue capability du stock limitée aux emplacements
+ * actifs. L'accès hopper/tuyau au comptoir est volontairement désactivé
+ * (problèmes de propriété) — à réactiver un jour via un upgrade dédié si la
+ * communauté le demande.
  */
 public class CappedItemHandler implements IItemHandler {
     private final ShopBlockEntity be;

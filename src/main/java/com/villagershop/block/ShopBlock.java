@@ -11,6 +11,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Explosion;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
@@ -86,6 +87,28 @@ public class ShopBlock extends Block implements EntityBlock {
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
         if (level.isClientSide || type != ModBlockEntities.SHOP_COUNTER.get()) return null;
         return (lvl, pos, st, be) -> ShopBlockEntity.serverTick(lvl, pos, st, (ShopBlockEntity) be);
+    }
+
+    @Override
+    public float getDestroyProgress(BlockState state, Player player, BlockGetter level, BlockPos pos) {
+        // Comptoir protégé : incassable par quiconque n'est pas proprio/co-proprio (créatif passe outre).
+        if (level.getBlockEntity(pos) instanceof ShopBlockEntity be && !be.canBreak(player)) return 0.0F;
+        return super.getDestroyProgress(state, player, level, pos);
+    }
+
+    @Override
+    public void attack(BlockState state, Level level, BlockPos pos, Player player) {
+        if (!level.isClientSide && level.getBlockEntity(pos) instanceof ShopBlockEntity be && !be.canBreak(player)) {
+            player.displayClientMessage(Component.translatable("message.villagershop.protected"), true);
+        }
+        super.attack(state, level, pos, player);
+    }
+
+    @Override
+    public float getExplosionResistance(BlockState state, BlockGetter level, BlockPos pos, Explosion explosion) {
+        // Upgrade obsidienne : résistance façon obsidienne.
+        if (level.getBlockEntity(pos) instanceof ShopBlockEntity be && be.hasBlastProtection()) return 1200.0F;
+        return super.getExplosionResistance(state, level, pos, explosion);
     }
 
     @Override

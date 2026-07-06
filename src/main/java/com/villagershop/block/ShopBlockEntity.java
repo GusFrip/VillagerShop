@@ -23,10 +23,6 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.common.capabilities.Capability;
-import net.minecraftforge.common.capabilities.ForgeCapabilities;
-import net.minecraftforge.common.util.LazyOptional;
-import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.ItemStackHandler;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -76,8 +72,26 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         }
     };
 
-    /** Améliorations : 0=Nether Star (invincible), 1=Prismarine(tether)/Amethyst(statique). */
-    private final ItemStackHandler upgrades = new ItemStackHandler(5) {
+    /** Slot d'amélioration : blocs d'émeraude (0 à 7), chacun débloque une offre supplémentaire. */
+    private final ItemStackHandler tradeUpgrade = new ItemStackHandler(1) {
+        @Override
+        public int getSlotLimit(int slot) {
+            return MAX_OFFERS - 1;
+        }
+
+        @Override
+        public boolean isItemValid(int slot, @NotNull ItemStack stack) {
+            return stack.is(Items.EMERALD_BLOCK);
+        }
+
+        @Override
+        protected void onContentsChanged(int slot) {
+            setChanged();
+        }
+    };
+
+    /** Améliorations : 0=Nether Star, 1=déplacement, 2=comm, 3=mémoire, 4=accès, 5=anti-explosion. */
+    private final ItemStackHandler upgrades = new ItemStackHandler(6) {
         @Override
         public int getSlotLimit(int slot) {
             return 1;
@@ -91,6 +105,7 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
                 case 2 -> stack.is(Items.LIGHTNING_ROD);
                 case 3 -> stack.is(Items.BOOKSHELF);
                 case 4 -> stack.is(Items.GOLD_BLOCK);
+                case 5 -> stack.is(Items.OBSIDIAN);
                 default -> false;
             };
         }
@@ -102,14 +117,14 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
 
         @Override
         public void deserializeNBT(CompoundTag nbt) {
-            // Taille fixe (5) : on ignore le "Size" d'anciennes sauvegardes (2/3 slots)
+            // Taille fixe (6) : on ignore le "Size" d'anciennes sauvegardes
             // pour ne pas rétrécir le handler et planter à l'ajout des slots récents.
-            setSize(5);
+            setSize(6);
             ListTag items = nbt.getList("Items", Tag.TAG_COMPOUND);
             for (int i = 0; i < items.size(); i++) {
                 CompoundTag it = items.getCompound(i);
                 int slot = it.getInt("Slot");
-                if (slot >= 0 && slot < 5) setStackInSlot(slot, ItemStack.of(it));
+                if (slot >= 0 && slot < 6) setStackInSlot(slot, ItemStack.of(it));
             }
         }
     };
@@ -135,9 +150,6 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
 
     public enum MovementMode { FREE, TETHER, STATIC }
 
-    private final LazyOptional<IItemHandler> storageCap =
-            LazyOptional.of(() -> new CappedItemHandler(this, storage));
-
     @Nullable
     private UUID owner;
     private final Set<UUID> allowed = new HashSet<>();
@@ -153,6 +165,13 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
     // ----- Capacité / coffres ---------------------------------------------
 
     public ItemStackHandler getChestUpgrade() { return chestUpgrade; }
+
+    public ItemStackHandler getTradeUpgrade() { return tradeUpgrade; }
+
+    /** Nombre d'offres actives : 1 de base + 1 par bloc d'émeraude (max 8). */
+    public int getActiveOfferCount() {
+        return Math.min(MAX_OFFERS, 1 + Math.min(MAX_OFFERS - 1, tradeUpgrade.getStackInSlot(0).getCount()));
+    }
 
     public ItemStackHandler getUpgrades() { return upgrades; }
 
@@ -173,6 +192,14 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
 
     /** Bloc d'or : gestion des co-propriétaires accessible. */
     public boolean hasAccess() { return !upgrades.getStackInSlot(4).isEmpty(); }
+
+    /** Obsidienne : le comptoir résiste aux explosions. */
+    public boolean hasBlastProtection() { return !upgrades.getStackInSlot(5).isEmpty(); }
+
+    /** Casse autorisée : proprio/co-proprios (mêmes règles que l'accès config) ou joueur en créatif. */
+    public boolean canBreak(Player player) {
+        return player.isCreative() || canAccess(player);
+    }
 
     /** Sérialise la config (nom, offres, co-proprios) — pour le livre de sauvegarde. */
     public CompoundTag exportConfig() {
@@ -276,7 +303,7 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
 
     /** Une vente est bloquée par manque de MARCHANDISE (result indisponible). */
     public boolean hasSupplyProblem() {
-        for (int i = 0; i < MAX_OFFERS; i++) {
+        for (int i = 0; i < getActiveOfferCount(); i++) {
             ShopOffer o = offers[i];
             if (!o.isValid()) continue;
             if (countInStorage(o.getResult()) < o.getResult().getCount()) return true;
@@ -286,7 +313,7 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
 
     /** Une vente est bloquée par manque de PLACE pour encaisser le paiement (stock plein). */
     public boolean hasStockProblem() {
-        for (int i = 0; i < MAX_OFFERS; i++) {
+        for (int i = 0; i < getActiveOfferCount(); i++) {
             ShopOffer o = offers[i];
             if (!o.isValid()) continue;
             if (countInStorage(o.getResult()) >= o.getResult().getCount() && maxTrades(o) == 0) return true;
@@ -349,6 +376,17 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         allowed.add(uuid);
         if (name != null) nameCache.put(uuid, name);
         setChanged();
+    }
+
+
+    /** Transfère la propriété à un co-proprio existant ; l'ancien proprio devient co-proprio. */
+    public boolean transferOwner(UUID newOwner) {
+        if (newOwner == null || !allowed.contains(newOwner)) return false;
+        allowed.remove(newOwner);
+        if (owner != null) allowed.add(owner);
+        owner = newOwner;
+        setChanged();
+        return true;
     }
 
     public void removeAllowed(UUID uuid) {
@@ -547,11 +585,8 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
     // ----- Transaction (serveur) ------------------------------------------
 
     public boolean canFulfill(ShopOffer offer) {
-        if (!offer.isValid()) return false;
-        if (countInStorage(offer.getResult()) < offer.getResult().getCount()) return false;
-        if (!storageCanAccept(offer.getPriceA())) return false;
-        if (!offer.getPriceB().isEmpty() && !storageCanAccept(offer.getPriceB())) return false;
-        return true;
+        // Simulation exacte (retrait marchandise puis encaissement des DEUX paiements).
+        return offer.isValid() && maxTrades(offer) >= 1;
     }
 
     private int countInPlayer(Player player, ItemStack like) {
@@ -579,7 +614,7 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
 
     public boolean tryTrade(int offerIndex, Player player) {
         if (level == null || level.isClientSide) return false;
-        if (offerIndex < 0 || offerIndex >= MAX_OFFERS) return false;
+        if (offerIndex < 0 || offerIndex >= getActiveOfferCount()) return false;
         ShopOffer offer = offers[offerIndex];
         if (!canFulfill(offer)) return false;
 
@@ -587,6 +622,8 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         if (!offer.getPriceB().isEmpty()
                 && countInPlayer(player, offer.getPriceB()) < offer.getPriceB().getCount()) return false;
 
+        // Marchandise retirée AVANT d'encaisser : même ordre que la simulation maxTrades.
+        extractFromStorage(offer.getResult(), offer.getResult().getCount());
         removeFromPlayer(player, offer.getPriceA(), offer.getPriceA().getCount());
         insertIntoStorage(offer.getPriceA().copy());
         if (!offer.getPriceB().isEmpty()) {
@@ -594,7 +631,6 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
             insertIntoStorage(offer.getPriceB().copy());
         }
 
-        extractFromStorage(offer.getResult(), offer.getResult().getCount());
         ItemStack reward = offer.getResult().copy();
         if (!player.getInventory().add(reward)) {
             player.drop(reward, false);
@@ -610,6 +646,7 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         super.saveAdditional(tag);
         tag.put("Storage", storage.serializeNBT());
         tag.put("ChestUpgrade", chestUpgrade.serializeNBT());
+        tag.put("TradeUpgrade", tradeUpgrade.serializeNBT());
         tag.put("Upgrades", upgrades.serializeNBT());
         tag.put("SaveSlot", saveSlot.serializeNBT());
         if (owner != null) tag.putUUID("Owner", owner);
@@ -639,6 +676,7 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         super.load(tag);
         if (tag.contains("Storage")) storage.deserializeNBT(tag.getCompound("Storage"));
         if (tag.contains("ChestUpgrade")) chestUpgrade.deserializeNBT(tag.getCompound("ChestUpgrade"));
+        if (tag.contains("TradeUpgrade")) tradeUpgrade.deserializeNBT(tag.getCompound("TradeUpgrade"));
         if (tag.contains("Upgrades")) upgrades.deserializeNBT(tag.getCompound("Upgrades"));
         if (tag.contains("SaveSlot")) saveSlot.deserializeNBT(tag.getCompound("SaveSlot"));
         shopName = tag.getString("ShopName");
@@ -664,14 +702,23 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         }
     }
 
+
+    /** Synchronise le BE au client (chunk load) : le client connaît le proprio
+     *  -> pas d'animation de casse fantôme sur un comptoir protégé. */
+    @Override
+    public CompoundTag getUpdateTag() {
+        return saveWithoutMetadata();
+    }
+
     /** Lâche tout (stock + coffres installés) quand le bloc est cassé. */
     public void dropContents() {
         if (level == null) return;
-        SimpleContainer c = new SimpleContainer(MAX_STORAGE + 1 + upgrades.getSlots() + saveSlot.getSlots());
+        SimpleContainer c = new SimpleContainer(MAX_STORAGE + 2 + upgrades.getSlots() + saveSlot.getSlots());
         for (int i = 0; i < MAX_STORAGE; i++) c.setItem(i, storage.getStackInSlot(i));
         c.setItem(MAX_STORAGE, chestUpgrade.getStackInSlot(0));
-        for (int i = 0; i < upgrades.getSlots(); i++) c.setItem(MAX_STORAGE + 1 + i, upgrades.getStackInSlot(i));
-        for (int i = 0; i < saveSlot.getSlots(); i++) c.setItem(MAX_STORAGE + 1 + upgrades.getSlots() + i, saveSlot.getStackInSlot(i));
+        c.setItem(MAX_STORAGE + 1, tradeUpgrade.getStackInSlot(0));
+        for (int i = 0; i < upgrades.getSlots(); i++) c.setItem(MAX_STORAGE + 2 + i, upgrades.getStackInSlot(i));
+        for (int i = 0; i < saveSlot.getSlots(); i++) c.setItem(MAX_STORAGE + 2 + upgrades.getSlots() + i, saveSlot.getStackInSlot(i));
         Containers.dropContents(level, getBlockPos(), c);
     }
 
@@ -785,19 +832,9 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         return js.isPresent() && js.get().pos().equals(pos) && js.get().dimension().equals(level.dimension());
     }
 
-    // ----- Capabilities ----------------------------------------------------
-
-    @Override
-    public @NotNull <T> LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
-        if (cap == ForgeCapabilities.ITEM_HANDLER) return storageCap.cast();
-        return super.getCapability(cap, side);
-    }
-
-    @Override
-    public void invalidateCaps() {
-        super.invalidateCaps();
-        storageCap.invalidate();
-    }
+    // NB : pas de capability item handler exposée -> les hoppers/tuyaux ne peuvent
+    // PAS interagir avec le comptoir (problèmes de propriété). Peut-être un jour
+    // via un upgrade dédié ; le CappedItemHandler est conservé en sommeil pour ça.
 
     // ----- MenuProvider ----------------------------------------------------
 

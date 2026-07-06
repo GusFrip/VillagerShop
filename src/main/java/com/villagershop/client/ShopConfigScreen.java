@@ -6,6 +6,7 @@ import com.villagershop.menu.ChestUpgradeSlot;
 import com.villagershop.menu.DynamicStorageSlot;
 import com.villagershop.menu.ShopConfigMenu;
 import com.villagershop.menu.ToggleGhostSlot;
+import com.villagershop.menu.TradeUpgradeSlot;
 import com.villagershop.menu.UpgradeSlot;
 import com.villagershop.network.LocateVillagerPacket;
 import com.villagershop.network.SaveActionPacket;
@@ -13,6 +14,7 @@ import com.villagershop.network.ManageAllowedPacket;
 import com.villagershop.network.ModNetwork;
 import com.villagershop.network.RequestAllowedPacket;
 import com.villagershop.network.SetShopNamePacket;
+import com.villagershop.network.TransferOwnerPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -21,6 +23,8 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
@@ -46,6 +50,7 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
 
     // Copropriétaires (onglet Shop)
     private static final int CO_X = 8, CO_Y = 92, CO_ROW_H = 11, CO_VISIBLE = 3, CO_W = 158, CO_SB_X = 168;
+    private static final int CO_REMOVE_W = 12; // largeur de la zone cliquable du ✕
 
     private int currentTab = TAB_SHOP;
 
@@ -141,8 +146,9 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
     private void updateSlotVisibility() {
         boolean trade = currentTab == TAB_TRADE, stock = currentTab == TAB_STOCK;
         for (int i = 0; i < ShopConfigMenu.GHOST_SLOTS; i++)
-            ((ToggleGhostSlot) menu.slots.get(i)).setVisible(trade);
+            ((ToggleGhostSlot) menu.slots.get(i)).setVisible(trade && (i / ShopConfigMenu.GHOST_PER_OFFER) < menu.getTradeCount());
         ((ChestUpgradeSlot) menu.slots.get(ShopConfigMenu.CHEST_SLOT_INDEX)).setVisible(currentTab == TAB_UPGRADE);
+        ((TradeUpgradeSlot) menu.slots.get(ShopConfigMenu.TRADE_SLOT_INDEX)).setVisible(currentTab == TAB_UPGRADE);
         for (int i = ShopConfigMenu.STORAGE_START; i < ShopConfigMenu.STORAGE_END; i++)
             ((DynamicStorageSlot) menu.slots.get(i)).setTabVisible(stock);
         boolean up = currentTab == TAB_UPGRADE;
@@ -191,11 +197,14 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
             if (hasAccessClient())
                 gg.drawString(font, Component.translatable("gui.villagershop.coowners"), 8, 66, 0x404040, false);
         } else if (currentTab == TAB_TRADE) {
-            for (int i = 0; i < ShopConfigMenu.OFFERS; i++) {
+            for (int i = 0; i < menu.getTradeCount(); i++) {
                 int base = (i / ShopConfigMenu.OFFER_ROWS == 0) ? ShopConfigMenu.COL0_X : ShopConfigMenu.COL1_X;
                 int y = ShopConfigMenu.OFFER_Y0 + (i % ShopConfigMenu.OFFER_ROWS) * ShopConfigMenu.OFFER_DY + 4;
                 gg.drawString(font, "→", base + 50, y, 0x555555, false);
             }
+            Component cnt = Component.translatable("gui.villagershop.offers_count",
+                    menu.getTradeCount(), ShopConfigMenu.OFFERS);
+            gg.drawString(font, cnt, imageWidth - font.width(cnt) - 8, 24, 0x404040, false);
             // séparateur vertical central
             gg.fill(87, 32, 88, 112, 0xFF555555);
             gg.fill(88, 32, 89, 112, 0xFFFFFFFF);
@@ -216,8 +225,9 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         super.render(gg, mouseX, mouseY, partialTick);
         renderTabs(gg);
         if (currentTab == TAB_SHOP && hasAccessClient()) renderCoownerList(gg, mouseX, mouseY);
-        else if (currentTab == TAB_STOCK) renderStorageScrollbar(gg);
-        else if (currentTab == TAB_UPGRADE) { renderGhostUpgrades(gg); renderGhostChest(gg); renderGhostSave(gg); }
+        else if (currentTab == TAB_STOCK) { renderStorageScrollbar(gg); renderLockedStock(gg, mouseX, mouseY); }
+        else if (currentTab == TAB_UPGRADE) { renderGhostUpgrades(gg); renderGhostChest(gg); renderGhostTrade(gg); renderGhostSave(gg); }
+        else if (currentTab == TAB_TRADE) renderLockedOffers(gg, mouseX, mouseY);
         renderTabTooltips(gg, mouseX, mouseY);
         renderTooltip(gg, mouseX, mouseY);
     }
@@ -242,14 +252,64 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         }
     }
 
+    /** Bloc d'émeraude grisé dans le slot de déblocage des offres. */
+    private void renderGhostTrade(GuiGraphics gg) {
+        if (menu.slots.get(ShopConfigMenu.TRADE_SLOT_INDEX).hasItem()) return;
+        ghostIcon(gg, new ItemStack(Items.EMERALD_BLOCK),
+                leftPos + ShopConfigMenu.TRADE_SLOT_X, topPos + ShopConfigMenu.TRADE_SLOT_Y);
+    }
+
+    /** Voile sur les offres verrouillées + tooltip explicatif. */
+    private void renderLockedOffers(GuiGraphics gg, int mouseX, int mouseY) {
+        Component tip = null;
+        for (int i = menu.getTradeCount(); i < ShopConfigMenu.OFFERS; i++) {
+            int base = leftPos + ((i / ShopConfigMenu.OFFER_ROWS == 0) ? ShopConfigMenu.COL0_X : ShopConfigMenu.COL1_X);
+            int y = topPos + ShopConfigMenu.OFFER_Y0 + (i % ShopConfigMenu.OFFER_ROWS) * ShopConfigMenu.OFFER_DY;
+            int x0 = base + ShopConfigMenu.OFF_PRICE_A_DX - 1, x1 = base + ShopConfigMenu.OFF_RESULT_DX + 17;
+            gg.fill(x0, y - 1, x1, y + 17, 0x55313131);
+            if (mouseX >= x0 && mouseX < x1 && mouseY >= y - 1 && mouseY < y + 17)
+                tip = Component.translatable("gui.villagershop.locked_offer");
+        }
+        if (tip != null) gg.renderTooltip(font, tip, mouseX, mouseY);
+    }
+
+    /** Voile sur les emplacements de stock verrouillés (coffres manquants). */
+    private void renderLockedStock(GuiGraphics gg, int mouseX, int mouseY) {
+        Component tip = null;
+        int cap = menu.getActiveCapacity();
+        for (int row = 0; row < ShopConfigMenu.VISIBLE_ROWS; row++) {
+            for (int col = 0; col < 9; col++) {
+                int idx = (menu.getScrollOffset() + row) * 9 + col;
+                if (idx < cap) continue;
+                int x = leftPos + ShopConfigMenu.STORAGE_X + col * 18;
+                int y = topPos + ShopConfigMenu.STORAGE_Y + row * 18;
+                slotBg(gg, x, y);
+                gg.fill(x - 1, y - 1, x + 17, y + 17, 0x55313131);
+                if (mouseX >= x - 1 && mouseX < x + 17 && mouseY >= y - 1 && mouseY < y + 17)
+                    tip = Component.translatable("gui.villagershop.locked_stock");
+            }
+        }
+        if (tip != null) gg.renderTooltip(font, tip, mouseX, mouseY);
+    }
+
     private void renderCoownerList(GuiGraphics gg, int mouseX, int mouseY) {
         for (int r = 0; r < CO_VISIBLE; r++) {
             int idx = coownerScroll + r;
             if (idx >= coownerNames.size()) break;
             int rx = leftPos + CO_X, ry = topPos + CO_Y + r * CO_ROW_H;
-            boolean hover = mouseX >= rx && mouseX < rx + CO_W && mouseY >= ry && mouseY < ry + CO_ROW_H;
-            if (hover) gg.fill(rx, ry, rx + CO_W, ry + CO_ROW_H, 0x66FF5555);
-            gg.drawString(font, (hover ? "✕ " : "• ") + coownerNames.get(idx), rx + 2, ry + 1, hover ? 0xFFFFFF : 0x404040, false);
+            boolean removable = idx > 0; // index 0 = proprio, jamais supprimable
+            // suppression uniquement via le ✕ (zone de 12 px à gauche de la ligne)
+            boolean hoverX = removable && mouseX >= rx && mouseX < rx + CO_REMOVE_W
+                    && mouseY >= ry && mouseY < ry + CO_ROW_H;
+            if (hoverX) gg.fill(rx, ry, rx + CO_W, ry + CO_ROW_H, 0x66FF5555);
+            gg.drawString(font, (removable ? "✕ " : "• ") + coownerNames.get(idx),
+                    rx + 2, ry + 1, hoverX ? 0xFFFFFF : 0x404040, false);
+            if (removable) {
+                // ★ à droite : Maj+clic = transfert de la boutique à ce co-proprio
+                boolean hoverStar = mouseX >= rx + CO_W - CO_REMOVE_W && mouseX < rx + CO_W
+                        && mouseY >= ry && mouseY < ry + CO_ROW_H;
+                gg.drawString(font, "★", rx + CO_W - 10, ry + 1, hoverStar ? 0xFFAA00 : 0x9A9A9A, false);
+            }
         }
         int max = Math.max(0, coownerNames.size() - CO_VISIBLE);
         drawScroller(gg, leftPos + CO_SB_X, topPos + CO_Y, CO_VISIBLE * CO_ROW_H, coownerScroll, max);
@@ -258,7 +318,7 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
     /** Coffre grisé indiquant ce qu'on peut déposer (façon lapis de la table d'enchantement). */
     private static final ItemStack[] UPGRADE_HINTS = {
             new ItemStack(Items.NETHER_STAR), new ItemStack(Items.PRISMARINE_SHARD), new ItemStack(Items.LIGHTNING_ROD),
-            new ItemStack(Items.BOOKSHELF), new ItemStack(Items.GOLD_BLOCK)};
+            new ItemStack(Items.BOOKSHELF), new ItemStack(Items.GOLD_BLOCK), new ItemStack(Items.OBSIDIAN)};
 
     private void renderGhostUpgrades(GuiGraphics gg) {
         for (int i = 0; i < ShopConfigMenu.UPGRADE_COUNT; i++) {
@@ -360,7 +420,19 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
             int r = (int) ((my - (topPos + CO_Y)) / CO_ROW_H);
             int idx = coownerScroll + r;
             if (r >= 0 && r < CO_VISIBLE && idx < coownerNames.size()) {
-                ModNetwork.sendToServer(new ManageAllowedPacket(menu.getPos(), coownerNames.get(idx), false));
+                // suppression uniquement au clic sur le ✕ (12 px à gauche), jamais le proprio
+                if (idx > 0 && mx < leftPos + CO_X + CO_REMOVE_W) {
+                    ModNetwork.sendToServer(new ManageAllowedPacket(menu.getPos(), coownerNames.get(idx), false));
+                } else if (idx > 0 && mx >= leftPos + CO_X + CO_W - CO_REMOVE_W) {
+                    // transfert de propriété : Maj+clic sur ★ (le serveur vérifie que l'émetteur est proprio)
+                    if (hasShiftDown()) {
+                        ModNetwork.sendToServer(new TransferOwnerPacket(menu.getPos(), coownerNames.get(idx)));
+                    } else {
+                        Minecraft mcl = Minecraft.getInstance();
+                        if (mcl.player != null) mcl.player.displayClientMessage(
+                                Component.translatable("gui.villagershop.transfer_hint"), true);
+                    }
+                }
                 return true;
             }
         }
@@ -374,6 +446,20 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
             int track = ShopConfigMenu.VISIBLE_ROWS * 18;
             if (menu.getMaxScroll() > 0 && over(mx, my, leftPos + 172, topPos + ShopConfigMenu.STORAGE_Y, 14, track)) {
                 storageScrolling = true; dragStorage(my); return true;
+            }
+        }
+        // Slots fantômes : clic traité dès l'APPUI (un micro-drag devenait un
+        // QUICK_CRAFT avalé par le menu -> il fallait cliquer plusieurs fois).
+        if (currentTab == TAB_TRADE) {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.gameMode != null && mc.player != null) {
+                for (int i = 0; i < ShopConfigMenu.GHOST_SLOTS; i++) {
+                    Slot slot = menu.slots.get(i);
+                    if (slot.isActive() && isHovering(slot.x, slot.y, 16, 16, mx, my)) {
+                        mc.gameMode.handleInventoryMouseClick(menu.containerId, i, button, ClickType.PICKUP, mc.player);
+                        return true;
+                    }
+                }
             }
         }
         return super.mouseClicked(mx, my, button);

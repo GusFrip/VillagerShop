@@ -37,6 +37,8 @@ public class ModNetwork {
                 LocateVillagerPacket::encode, LocateVillagerPacket::decode, LocateVillagerPacket::handle);
         CHANNEL.registerMessage(id++, SaveActionPacket.class,
                 SaveActionPacket::encode, SaveActionPacket::decode, SaveActionPacket::handle);
+        CHANNEL.registerMessage(id++, TransferOwnerPacket.class,
+                TransferOwnerPacket::encode, TransferOwnerPacket::decode, TransferOwnerPacket::handle);
     }
 
     public static void sendToServer(Object msg) {

@@ -31,7 +31,7 @@ public class ShopMerchant implements Merchant {
 
     private MerchantOffers build() {
         MerchantOffers list = new MerchantOffers();
-        for (int i = 0; i < ShopBlockEntity.MAX_OFFERS; i++) {
+        for (int i = 0; i < be.getActiveOfferCount(); i++) {
             ShopOffer o = be.getOffer(i);
             if (!o.isValid()) continue;
             // nb d'achats possibles = min(marchandise dispo, place pour encaisser le paiement)
@@ -78,13 +78,14 @@ public class ShopMerchant implements Merchant {
     public void notifyTrade(MerchantOffer offer) {
         // Comptabiliser la vente : l'offre se bloque quand maxUses (= stock à l'ouverture) est atteint.
         offer.increaseUses();
+        // Retirer la marchandise du stock D'ABORD : ça libère la place que la
+        // simulation maxTrades suppose disponible pour encaisser le paiement.
+        be.removeFromStock(offer.getResult(), offer.getResult().getCount());
         // Encaisser le paiement dans le stock
         be.depositToStock(offer.getCostA().copy());
         if (!offer.getCostB().isEmpty()) {
             be.depositToStock(offer.getCostB().copy());
         }
-        // Retirer la marchandise du stock
-        be.removeFromStock(offer.getResult(), offer.getResult().getCount());
         // Son de vente (playTradeSound du menu est neutralisé pour éviter le crash)
         if (be.getLevel() instanceof net.minecraft.server.level.ServerLevel sl) {
             sl.playSound(null, be.getBlockPos(), getNotifyTradeSound(),

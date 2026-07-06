@@ -3,6 +3,23 @@
 All notable changes to VillagerShop are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.4.0] - 2026-07-04
+### Added
+- **Trades upgrade** (Emerald Block): counters now start with **1 unlocked trade**; each Emerald Block placed in the Upgrades tab unlocks one more, up to 7 blocks = 8 trades. Locked trades are greyed out; their settings are kept when blocks are removed.
+- **Ownership transfer**: the owner can Shift+click a co-owner's ★ in the list to hand over the shop (old owner becomes co-owner).
+- Locked stock slots are now greyed out with a tooltip (Chest required).
+- **Blast protection upgrade** (Obsidian): the counter resists explosions (creepers, TNT).
+
+### Changed
+- **Existing counters are affected by the trades upgrade**: after updating, only the first trade is unlocked until Emerald Blocks are added. Configured trades are NOT lost — they re-activate as you add blocks.
+- **Hoppers and pipes can no longer interact with the counter** (ownership/security concerns). May come back later as a dedicated upgrade.
+- Co-owner list: removal now requires clicking precisely on the ✕ (no more accidental removals when clicking a row).
+- **Owned counters are now protected**: only the owner and co-owners can break the counter (creative players bypass, e.g. for admins). Unowned counters remain breakable by anyone.
+
+### Fixed
+- Setting an item in a trade slot sometimes required several clicks (micro-drag was swallowed).
+- The last payment of a full-stock trading session could drop on the ground instead of entering the stock.
+- Save book: loading a config while the counter GUI was open didn't refresh (and could be overwritten by stale data).
 ## [1.3.0] - 2026-06-30
 ### Added
 - **Free distribution**: leave an offer's price empty to give the item away for free (still limited by physical stock). Handled directly by the shop's merchant menu (no extra dependency), capped at one stack per shift-click, no duplication.

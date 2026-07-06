@@ -10,6 +10,10 @@
     },
     {
       "type": "patchouli:text",
+      "text": "book.villagershop.guide.e6.p8"
+    },
+    {
+      "type": "patchouli:text",
       "text": "book.villagershop.guide.e6.p2"
     },
     {
@@ -32,6 +36,10 @@
     {
       "type": "patchouli:text",
       "text": "book.villagershop.guide.e6.p7"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e6.p9"
     }
   ]
 }

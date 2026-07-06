@@ -71,7 +71,8 @@ public class DynamicStorageSlot extends Slot {
 
     @Override
     public int getMaxStackSize(ItemStack stack) {
-        return getMaxStackSize();
+        // re-plafonner au max de l'item (16 pour les perles, etc.)
+        return Math.min(getMaxStackSize(), stack.getMaxStackSize());
     }
 
     @Override

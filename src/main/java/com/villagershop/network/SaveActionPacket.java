@@ -33,6 +33,10 @@ public class SaveActionPacket {
             player.displayClientMessage(Component.translatable(key), true);
             if ("message.villagershop.import_ok".equals(key)) {
                 ModNetwork.sendTo(new SyncAllowedPacket(be.getAllowedNames()), player);
+                if (player.containerMenu instanceof com.villagershop.menu.ShopConfigMenu m
+                        && m.getPos().equals(msg.pos)) {
+                    m.reloadTemplatesFromBE();
+                }
             }
         });
         ctx.get().setPacketHandled(true);
