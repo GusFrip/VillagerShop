@@ -16,12 +16,17 @@ import net.minecraft.world.entity.player.Inventory;
 public class ShopStockScreen extends AbstractContainerScreen<ShopStockMenu> {
     private static final ResourceLocation TEXTURE =
             ResourceLocation.fromNamespaceAndPath(ShopMod.MOD_ID, "textures/gui/shop_stock.png");
+    /** Sprites vanilla du curseur de défilement (système de GUI sprites, 1.20.2+). */
+    private static final ResourceLocation SCROLLER_SPRITE =
+            ResourceLocation.withDefaultNamespace("container/creative_inventory/scroller");
+    private static final ResourceLocation SCROLLER_DISABLED =
+            ResourceLocation.withDefaultNamespace("container/creative_inventory/scroller_disabled");
 
     private static final int SCROLL_X = 174;
     private static final int SCROLL_Y = ShopStockMenu.STORAGE_Y;
     private static final int SCROLL_W = 12;
     private static final int TRACK_H = ShopStockMenu.VISIBLE_ROWS * 18;
-    private static final int KNOB_H = 14;
+    private static final int KNOB_H = 15;
 
     private boolean scrolling = false;
 
@@ -103,7 +108,7 @@ public class ShopStockScreen extends AbstractContainerScreen<ShopStockMenu> {
         gg.fill(x, y, x + SCROLL_W, y + TRACK_H, 0xFF373737);
         int max = menu.getMaxScroll();
         int knobY = (max == 0) ? y : y + (int) ((TRACK_H - KNOB_H) * (menu.getScrollOffset() / (double) max));
-        gg.fill(x + 1, knobY, x + SCROLL_W - 1, knobY + KNOB_H, max == 0 ? 0xFF6E6E6E : 0xFFC6C6C6);
+        gg.blitSprite(max == 0 ? SCROLLER_DISABLED : SCROLLER_SPRITE, x, knobY, SCROLL_W, KNOB_H);
     }
 
     private boolean overScrollbar(double mx, double my) {

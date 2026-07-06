@@ -35,9 +35,9 @@ import java.util.List;
 public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
     private static final ResourceLocation TEXTURE =
             ResourceLocation.fromNamespaceAndPath(ShopMod.MOD_ID, "textures/gui/shop_config.png");
-    /** Texture vanilla : on y prend le curseur de défilement (u=232, 12x15). */
-    private static final ResourceLocation VANILLA_TABS =
-            ResourceLocation.withDefaultNamespace("textures/gui/container/creative_inventory/tabs.png");
+    /** Sprite vanilla du curseur de défilement (système de GUI sprites, 1.20.2+). */
+    private static final ResourceLocation SCROLLER_SPRITE =
+            ResourceLocation.withDefaultNamespace("container/creative_inventory/scroller");
     private static final ResourceLocation TAB_TEX =
             ResourceLocation.fromNamespaceAndPath(ShopMod.MOD_ID, "textures/gui/tab.png");
 
@@ -369,7 +369,7 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         if (max <= 0) return; // pas de scroller si rien à faire défiler
         gg.fill(x, y, x + 14, y + trackH, 0xFF373737);
         int knobY = (max == 0) ? y : y + (int) ((trackH - 15) * (scroll / (double) max));
-        gg.fill(x + 1, knobY, x + 13, knobY + 15, 0xFFC6C6C6);
+        gg.blitSprite(SCROLLER_SPRITE, x + 1, knobY, 12, 15);
     }
 
     private void drawItem(GuiGraphics gg, ItemStack stack, int x, int y) {
