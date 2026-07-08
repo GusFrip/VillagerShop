@@ -2,7 +2,7 @@
 
 **Transforme tes villageois en marchands : des boutiques multijoueur entièrement configurables pour Minecraft NeoForge 1.21.1.**
 
-> Version 1.21.1 (NeoForge) du mod. La version 1.20.1 (Forge) vit dans le dossier `villagershop-mod` du même dépôt.
+> Version 1.21.1 (NeoForge) du mod. Les versions 1.20.1 (Forge) et 1.21.1 (Fabric) vivent dans les dossiers `villagershop-mod` et `villagershop-mod-1.21-fabric` du même dépôt.
 
 Pose un **Comptoir de marchand**, configure tes ventes et tes achats, et un **villageois** se lie au comptoir pour servir tes clients — exactement comme un villageois s'attache à un établi ou à une table de cartographie. Seul le propriétaire (ou les joueurs qu'il autorise) peut ouvrir la configuration.
 
@@ -31,14 +31,14 @@ Pose un **Comptoir de marchand**, configure tes ventes et tes achats, et un **vi
 
 ## Prérequis
 
-- **Minecraft 1.20.1**
-- **Forge 47.2.0+**
-- **[Patchouli](https://www.curseforge.com/minecraft/mc-mods/patchouli)** — dépendance obligatoire (à installer séparément, non incluse).
-- **JDK 17** pour compiler.
+- **Minecraft 1.21.1**
+- **NeoForge 21.1+**
+- **[Patchouli](https://www.curseforge.com/minecraft/mc-mods/patchouli)** (version NEOFORGE) — dépendance obligatoire.
+- **JDK 21** pour compiler.
 
 ## Installation
 
-1. Installe **Forge 1.20.1**.
+1. Installe **NeoForge 1.21.1**.
 2. Place **VillagerShop** ET **Patchouli** dans le dossier `mods/`.
 3. Sur un serveur, installe les deux mods côté serveur (et côté client pour les joueurs).
 

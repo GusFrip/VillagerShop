@@ -439,11 +439,10 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
     /** Dépose un paiement dans le stock ; lâche au sol le surplus si le stock est plein. */
     public void depositToStock(ItemStack stack) {
         if (stack.isEmpty()) return;
-        ItemStack remaining = stack.copy();
-        int cap = getActiveCapacity();
-        for (int i = 0; i < cap && !remaining.isEmpty(); i++) {
-            remaining = storage.insertItem(i, remaining, false);
-        }
+        // Deux passes (comme simInsert) : compléter les piles existantes d'abord,
+        // sinon le dernier paiement atterrit dans un slot fraîchement vidé au lieu
+        // de compléter la pile en cours (ex. 63+1 au lieu de 64).
+        ItemStack remaining = insertStacked(stack.copy());
         if (!remaining.isEmpty() && level != null && !level.isClientSide) {
             net.minecraft.world.Containers.dropItemStack(level,
                     getBlockPos().getX() + 0.5, getBlockPos().getY() + 1.0, getBlockPos().getZ() + 0.5,
@@ -488,10 +487,25 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
     }
 
     private void insertIntoStorage(ItemStack stack) {
+        insertStacked(stack);
+    }
+
+    /** Insertion en deux passes : piles existantes du même item, puis slots vides.
+     *  Renvoie ce qui n'a pas trouvé de place. Même ordre que la simulation simInsert. */
+    private ItemStack insertStacked(ItemStack stack) {
         int cap = getActiveCapacity();
         for (int i = 0; i < cap && !stack.isEmpty(); i++) {
-            stack = storage.insertItem(i, stack, false);
+            ItemStack s = storage.getStackInSlot(i);
+            if (!s.isEmpty() && ItemStack.isSameItemSameComponents(s, stack)) {
+                stack = storage.insertItem(i, stack, false);
+            }
         }
+        for (int i = 0; i < cap && !stack.isEmpty(); i++) {
+            if (storage.getStackInSlot(i).isEmpty()) {
+                stack = storage.insertItem(i, stack, false);
+            }
+        }
+        return stack;
     }
 
     private void extractFromStorage(ItemStack like, int amount) {
