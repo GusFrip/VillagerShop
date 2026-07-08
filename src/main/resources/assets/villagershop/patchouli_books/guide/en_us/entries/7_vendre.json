@@ -1,0 +1,16 @@
+{
+  "name": "book.villagershop.guide.e7.name",
+  "icon": "villagershop:shop_counter",
+  "category": "villagershop:main",
+  "sortnum": 6,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e7.p1"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e7.p2"
+    }
+  ]
+}

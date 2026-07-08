@@ -1,0 +1,42 @@
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'fabric-loom' version '1.16.3'
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = "${mod_id}-fabric-${minecraft_version}"
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories {
+    maven {
+        name = "BlameJared"
+        url = "https://maven.blamejared.com"
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    // Mappings Mojang officielles : le code reste identique aux versions Forge/NeoForge
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+    modImplementation "vazkii.patchouli:Patchouli:${patchouli_version}"
+}
+
+processResources {
+    inputs.property "version", mod_version
+    filesMatching("fabric.mod.json") {
+        expand "version": mod_version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+    options.release = 21
+}

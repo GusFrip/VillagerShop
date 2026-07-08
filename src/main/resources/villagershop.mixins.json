@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "package": "com.villagershop.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "ExplosionDamageCalculatorMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "server": [],
+  "client": []
+}

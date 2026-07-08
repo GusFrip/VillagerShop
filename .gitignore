@@ -1,0 +1,21 @@
+# Forge / Gradle
+.gradle/
+build/
+run/
+out/
+bin/
+*.launch
+.idea/
+*.iml
+*.ipr
+*.iws
+.eclipse/
+.settings/
+.classpath
+.project
+eclipse/
+# generated
+src/generated/resources/.cache/
+
+# Ancienne copie imbriquée du projet (à supprimer)
+/villagershop-mod/

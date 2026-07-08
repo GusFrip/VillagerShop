@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "villagershop",
+  "version": "${version}",
+  "name": "VillagerShop",
+  "description": "Crée des boutiques multijoueur gérées par des villageois. Pose un Comptoir de marchand, configure tes ventes et achats, et laisse un villageois servir tes clients.",
+  "authors": ["GusFrip"],
+  "license": "LGPL-3.0-only",
+  "icon": "logo.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.villagershop.ShopMod"],
+    "client": ["com.villagershop.client.ClientSetup"]
+  },
+  "mixins": ["villagershop.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "fabric-api": "*",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "patchouli": "*"
+  }
+}

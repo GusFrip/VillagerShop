@@ -1,0 +1,45 @@
+{
+  "name": "book.villagershop.guide.e6.name",
+  "icon": "minecraft:spectral_arrow",
+  "category": "villagershop:main",
+  "sortnum": 5,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e6.p1"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e6.p8"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e6.p2"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e6.p3"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e6.p4",
+      "anchor": "storage"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e6.p5"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e6.p6"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e6.p7"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e6.p9"
+    }
+  ]
+}
