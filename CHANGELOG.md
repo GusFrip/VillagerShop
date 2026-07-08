@@ -3,6 +3,9 @@
 All notable changes to VillagerShop are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.4.1] - 2026-07-05
+### Fixed
+- The last payment of a trading session could land in a freshly emptied stock slot instead of topping up the existing pile (e.g. 63+1 instead of a single stack of 64). Deposits now fill existing piles first, then empty slots — same order as the trade simulation.
 ## [1.4.0] - 2026-07-04
 ### Added
 - **Trades upgrade** (Emerald Block): counters now start with **1 unlocked trade**; each Emerald Block placed in the Upgrades tab unlocks one more, up to 7 blocks = 8 trades. Locked trades are greyed out; their settings are kept when blocks are removed.

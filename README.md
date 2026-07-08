@@ -2,6 +2,8 @@
 
 **Transforme tes villageois en marchands : des boutiques multijoueur entièrement configurables pour Minecraft Forge 1.20.1.**
 
+> Le mod existe aussi en **1.21.1** pour NeoForge (`villagershop-mod-1.21`) et Fabric (`villagershop-mod-1.21-fabric`), dans le même dépôt.
+
 Pose un **Comptoir de marchand**, configure tes ventes et tes achats, et un **villageois** se lie au comptoir pour servir tes clients — exactement comme un villageois s'attache à un établi ou à une table de cartographie. Seul le propriétaire (ou les joueurs qu'il autorise) peut ouvrir la configuration.
 
 ## Principe de jeu
