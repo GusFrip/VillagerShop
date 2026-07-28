@@ -33,8 +33,14 @@ public class VillagerInteractHandler {
 
     @SubscribeEvent
     public void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
-        if (!(event.getTarget() instanceof Villager villager)) return;
-        if (villager.getVillagerData().getProfession() != ModVillagers.SHOPKEEPER.get()) return;
+        if (!(event.getTarget() instanceof net.minecraft.world.entity.Mob mob)) return;
+        // Vendeur = villageois shopkeeper (mécanique historique) ou n'importe
+        // quel Mob portant un tag de liaison (vendeurs tiers, ex. pillager
+        // marchand de PillagerControl).
+        boolean isVillagerShopkeeper = mob instanceof Villager v
+                && v.getVillagerData().getProfession() == ModVillagers.SHOPKEEPER.get();
+        boolean isTaggedVendor = vendorTagPos(mob) != null;
+        if (!isVillagerShopkeeper && !isTaggedVendor) return;
 
         // On gère nous-mêmes l'interaction : pas de troc vanilla par défaut.
         event.setCanceled(true);
@@ -44,11 +50,13 @@ public class VillagerInteractHandler {
         Level level = event.getLevel();
         if (level.isClientSide) return;
 
-        ShopBlockEntity be = findShopFor(villager, level);
+        ShopBlockEntity be = findShopFor(mob, level);
         if (be == null) {
-            // villageois orphelin (comptoir disparu) : on le libère
-            villager.setVillagerData(villager.getVillagerData().setProfession(VillagerProfession.NONE));
-            villager.getBrain().eraseMemory(MemoryModuleType.JOB_SITE);
+            if (mob instanceof Villager villager) {
+                // villageois orphelin (comptoir disparu) : on le libère
+                villager.setVillagerData(villager.getVillagerData().setProfession(VillagerProfession.NONE));
+                villager.getBrain().eraseMemory(MemoryModuleType.JOB_SITE);
+            }
             player.displayClientMessage(Component.translatable("message.villagershop.no_shop"), true);
             return;
         }
@@ -75,28 +83,46 @@ public class VillagerInteractHandler {
     }
 
     @Nullable
-    private ShopBlockEntity findShopFor(Villager villager, Level level) {
-        Optional<GlobalPos> jobSite = villager.getBrain().getMemory(MemoryModuleType.JOB_SITE);
-        if (jobSite.isEmpty()) return null;
-        GlobalPos gp = jobSite.get();
-        if (!gp.dimension().equals(level.dimension())) return null;
-        BlockPos pos = gp.pos();
-        if (level.getBlockEntity(pos) instanceof ShopBlockEntity be) return be;
+    private ShopBlockEntity findShopFor(net.minecraft.world.entity.Mob mob, Level level) {
+        BlockPos pos = null;
+        if (mob instanceof Villager villager) {
+            Optional<GlobalPos> jobSite = villager.getBrain().getMemory(MemoryModuleType.JOB_SITE);
+            if (jobSite.isEmpty()) return null;
+            GlobalPos gp = jobSite.get();
+            if (!gp.dimension().equals(level.dimension())) return null;
+            pos = gp.pos();
+        } else {
+            pos = vendorTagPos(mob);
+        }
+        if (pos != null && level.getBlockEntity(pos) instanceof ShopBlockEntity be) return be;
         return null;
     }
 
-    /** Si un villageois Marchand meurt, prévient les propriétaires connectés. */
+    /** Position du comptoir encodée dans le tag de liaison d'un vendeur tiers, ou null. */
+    @Nullable
+    private static BlockPos vendorTagPos(net.minecraft.world.entity.Mob mob) {
+        for (String tag : mob.getTags()) {
+            if (tag.startsWith("villagershop_vendor_")) {
+                try {
+                    return BlockPos.of(Long.parseLong(tag.substring("villagershop_vendor_".length())));
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Si un vendeur (villageois ou tiers) meurt, prévient les propriétaires connectés. */
     @SubscribeEvent
     public void onVillagerDeath(LivingDeathEvent event) {
-        if (!(event.getEntity() instanceof Villager villager)) return;
-        Level level = villager.level();
+        if (!(event.getEntity() instanceof net.minecraft.world.entity.Mob mob)) return;
+        Level level = mob.level();
         if (level.isClientSide) return;
-        if (villager.getVillagerData().getProfession() != ModVillagers.SHOPKEEPER.get()) return;
+        if (mob instanceof Villager villager
+                && villager.getVillagerData().getProfession() != ModVillagers.SHOPKEEPER.get()) return;
 
-        Optional<GlobalPos> jobSite = villager.getBrain().getMemory(MemoryModuleType.JOB_SITE);
-        if (jobSite.isEmpty() || !jobSite.get().dimension().equals(level.dimension())) return;
-        BlockPos pos = jobSite.get().pos();
-        if (!(level.getBlockEntity(pos) instanceof ShopBlockEntity be)) return;
+        ShopBlockEntity be = findShopFor(mob, level);
+        if (be == null) return;
 
         if (!be.hasNotifier()) return; // paratonnerre requis pour les notifications
         if (level instanceof ServerLevel sl) {

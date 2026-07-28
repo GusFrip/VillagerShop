@@ -9,7 +9,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.entity.Mob;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
@@ -32,7 +32,7 @@ public record LocateVillagerPacket(BlockPos pos) implements CustomPacketPayload 
         if (!(player.level().getBlockEntity(msg.pos) instanceof ShopBlockEntity be)) return;
         if (!be.canAccess(player)) return;
         if (!be.hasNotifier()) return; // module communication requis
-        Villager v = be.findShopkeeper();
+        Mob v = be.findShopkeeper();
         if (v == null) {
             player.displayClientMessage(Component.translatable("message.villagershop.villager_missing"), false);
             return;

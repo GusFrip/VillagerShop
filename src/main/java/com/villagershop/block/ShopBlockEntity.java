@@ -780,10 +780,19 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         stockFlagged = st;
     }
 
+    /**
+     * Tag d'entité identifiant un vendeur non-villageois lié à ce comptoir
+     * (posé par un mod tiers, ex. PillagerControl sur ses pillagers marchands).
+     * Convention publique : "villagershop_vendor_" + BlockPos.asLong().
+     */
+    public static String vendorTag(BlockPos pos) {
+        return "villagershop_vendor_" + pos.asLong();
+    }
+
     private void applyToVillager(Level level, BlockPos pos, BlockState state) {
         net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(pos).inflate(16.0);
-        for (Villager v : level.getEntitiesOfClass(Villager.class, box)) {
-            if (!isThisShopkeeper(v, level, pos)) continue;
+        for (net.minecraft.world.entity.Mob v : level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, box)) {
+            if (!isThisVendor(v, level, pos)) continue;
             v.setInvulnerable(isImmortal());
             switch (getMovementMode()) {
                 case STATIC -> {
@@ -820,34 +829,48 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         }
     }
 
-    /** Rend le villageois à son état normal (à la casse du comptoir). */
+    /** Rend le vendeur à son état normal (à la casse du comptoir). */
     public void revertVillager(Level level, BlockPos pos) {
         net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(pos).inflate(16.0);
-        for (Villager v : level.getEntitiesOfClass(Villager.class, box)) {
-            if (!isThisShopkeeper(v, level, pos)) continue;
+        for (net.minecraft.world.entity.Mob v : level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, box)) {
+            if (!isThisVendor(v, level, pos)) continue;
             v.setInvulnerable(false);
             if (v.isNoAi()) v.setNoAi(false);
             v.clearRestriction();
-            // libère le villageois : son comptoir n'existe plus
-            v.setVillagerData(v.getVillagerData().setProfession(net.minecraft.world.entity.npc.VillagerProfession.NONE));
-            v.getBrain().eraseMemory(MemoryModuleType.JOB_SITE);
+            if (v instanceof Villager villager) {
+                // libère le villageois : son comptoir n'existe plus
+                villager.setVillagerData(villager.getVillagerData().setProfession(net.minecraft.world.entity.npc.VillagerProfession.NONE));
+                villager.getBrain().eraseMemory(MemoryModuleType.JOB_SITE);
+            } else {
+                // vendeur tiers : on retire simplement son tag de liaison,
+                // son mod d'origine gère la suite (perte de métier, etc.)
+                v.removeTag(vendorTag(pos));
+            }
         }
     }
 
     @Nullable
-    public Villager findShopkeeper() {
+    public net.minecraft.world.entity.Mob findShopkeeper() {
         if (level == null) return null;
         net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(getBlockPos()).inflate(16.0);
-        for (Villager v : level.getEntitiesOfClass(Villager.class, box)) {
-            if (isThisShopkeeper(v, level, getBlockPos())) return v;
+        for (net.minecraft.world.entity.Mob v : level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, box)) {
+            if (isThisVendor(v, level, getBlockPos())) return v;
         }
         return null;
     }
 
-    private static boolean isThisShopkeeper(Villager v, Level level, BlockPos pos) {
-        if (v.getVillagerData().getProfession() != ModVillagers.SHOPKEEPER.get()) return false;
-        var js = v.getBrain().getMemory(MemoryModuleType.JOB_SITE);
-        return js.isPresent() && js.get().pos().equals(pos) && js.get().dimension().equals(level.dimension());
+    /**
+     * Le vendeur de CE comptoir : soit un villageois shopkeeper dont le
+     * JOB_SITE pointe ici (mécanique historique), soit n'importe quel Mob
+     * portant le tag de liaison (vendeurs tiers, ex. pillager marchand).
+     */
+    public static boolean isThisVendor(net.minecraft.world.entity.Mob mob, Level level, BlockPos pos) {
+        if (mob instanceof Villager v) {
+            if (v.getVillagerData().getProfession() != ModVillagers.SHOPKEEPER.get()) return false;
+            var js = v.getBrain().getMemory(MemoryModuleType.JOB_SITE);
+            return js.isPresent() && js.get().pos().equals(pos) && js.get().dimension().equals(level.dimension());
+        }
+        return mob.getTags().contains(vendorTag(pos));
     }
 
     // ----- MenuProvider ----------------------------------------------------
