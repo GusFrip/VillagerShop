@@ -87,5 +87,6 @@
   "message.villagershop.transfer_received": "%s t'a transféré la boutique « %s »",
   "message.villagershop.transfer_fail": "Transfert impossible — le joueur doit être co-propriétaire",
   "message.villagershop.protected": "Ce comptoir appartient à quelqu'un — tu ne peux pas le casser",
-  "book.villagershop.guide.e6.p9": "$(l)Upgrade anti-explosion$() — $(item)Obsidienne$() :$(br2)le comptoir résiste aux explosions (creepers, TNT).$(br2)Note : un comptoir qui a un proprio ne peut être $(l)cassé$() que par son proprio ou ses co-proprios (les joueurs en créatif passent outre)."
+  "book.villagershop.guide.e6.p9": "$(l)Upgrade anti-explosion$() — $(item)Obsidienne$() :$(br2)le comptoir résiste aux explosions (creepers, TNT).$(br2)Note : un comptoir qui a un proprio ne peut être $(l)cassé$() que par son proprio ou ses co-proprios (les joueurs en créatif passent outre).",
+  "gui.villagershop.upgrade.guard_kit": "Kit de garde : le vendeur pillager riposte à l'arbalète s'il est attaqué"
 }

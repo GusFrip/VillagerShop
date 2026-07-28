@@ -36,7 +36,7 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     public static final int STORAGE_VISIBLE = VISIBLE_ROWS * 9;     // 27
     public static final int STORAGE_END = STORAGE_START + STORAGE_VISIBLE; // 52
     public static final int UPGRADE_START = STORAGE_END;            // 43 (3 slots)
-    public static final int UPGRADE_COUNT = 6;
+    public static final int UPGRADE_COUNT = com.villagershop.block.ShopBlockEntity.UPGRADE_SLOTS; // 7 (le 7e = Kit de garde)
     public static final int SAVE_QUILL_INDEX = UPGRADE_START + UPGRADE_COUNT;
     public static final int SAVE_SIGNED_INDEX = SAVE_QUILL_INDEX + 1;
     public static final int TRADE_SLOT_INDEX = SAVE_SIGNED_INDEX + 1;
@@ -52,14 +52,19 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     public static final int CHEST_SLOT_X = 134, CHEST_SLOT_Y = 40;
     public static final int TRADE_SLOT_X = 8, TRADE_SLOT_Y = 40;
     // rangée de 8 slots (pas de 18) : émeraude(8), 6 upgrades, coffre(134)
-    public static final int[] UPGRADE_XS = {26, 44, 62, 80, 98, 116}; // immortalité, déplacement, communication, mémoire, accès, anti-explosion
-    public static final int[] UPGRADE_YS = {40, 40, 40, 40, 40, 40};
+    public static final int[] UPGRADE_XS = {26, 44, 62, 80, 98, 116, 26}; // immortalité, déplacement, communication, mémoire, accès, anti-explosion, kit de garde
+    public static final int[] UPGRADE_YS = {40, 40, 40, 40, 40, 40, 62};   // le kit de garde est sur une 2e rangée
     public static final int SAVE_QUILL_X = 8, SAVE_SIGNED_X = 30, SAVE_Y = 90;
     public static final int STORAGE_X = 8, STORAGE_Y = 62;
     public static final int PLAYER_INV_X = 8, PLAYER_INV_Y = 138;
 
     @Nullable
     private final ShopBlockEntity be;
+    /**
+     * Vrai si le vendeur de ce comptoir est une entité tierce (pillager de
+     * PillagerControl...) : conditionne l'affichage du slot Kit de garde.
+     */
+    private boolean moddedVendor;
     private final Container templates;
     private final IItemHandler chestHandler;
     private final IItemHandler upgradeHandler;
@@ -71,7 +76,9 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     /** Constructeur CLIENT. */
     public ShopConfigMenu(int id, Inventory inv, FriendlyByteBuf buf) {
         this(id, inv, null, buf.readBlockPos(), buf.readUtf(), new SimpleContainer(GHOST_SLOTS),
-                new ItemStackHandler(ShopBlockEntity.MAX_STORAGE), new ItemStackHandler(1), new ItemStackHandler(6), new ItemStackHandler(2), new ItemStackHandler(1));
+                new ItemStackHandler(ShopBlockEntity.MAX_STORAGE), new ItemStackHandler(1),
+                new ItemStackHandler(ShopBlockEntity.UPGRADE_SLOTS), new ItemStackHandler(2), new ItemStackHandler(1));
+        this.moddedVendor = buf.readBoolean();
     }
 
     /** Constructeur SERVEUR. */
@@ -83,6 +90,10 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
                            Container templates, IItemHandlerModifiable storage, IItemHandler chestHandler, IItemHandler upgradeHandler, IItemHandler saveHandler, IItemHandler tradeHandler) {
         super(ModMenus.SHOP_CONFIG.get(), id);
         this.be = be;
+        if (be != null && be.getLevel() != null) {
+            var vendor = be.findShopkeeper();
+            this.moddedVendor = vendor != null && !(vendor instanceof net.minecraft.world.entity.npc.Villager);
+        }
         this.pos = pos;
         this.shopName = shopName == null ? "" : shopName;
         this.templates = templates;
@@ -237,7 +248,11 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
             if (!stack.isEmpty() && stack.is(Items.WRITABLE_BOOK)) moved = moveItemStackTo(stack, SAVE_QUILL_INDEX, SAVE_QUILL_INDEX + 1, false) || moved;
             if (!stack.isEmpty() && stack.is(Items.WRITTEN_BOOK)) moved = moveItemStackTo(stack, SAVE_SIGNED_INDEX, SAVE_SIGNED_INDEX + 1, false) || moved;
             if (!stack.isEmpty() && stack.is(Items.EMERALD_BLOCK)) moved = moveItemStackTo(stack, TRADE_SLOT_INDEX, TRADE_SLOT_INDEX + 1, false) || moved;
-            if (!stack.isEmpty()) moved = moveItemStackTo(stack, UPGRADE_START, UPGRADE_START + UPGRADE_COUNT, false) || moved;
+            // Le slot Kit de garde (dernier) est exclu du shift-clic quand il est
+            // masqué (vendeur villageois) : sinon l'item disparaîtrait dans un
+            // slot invisible.
+            int upgradeEnd = UPGRADE_START + (moddedVendor ? UPGRADE_COUNT : UPGRADE_COUNT - 1);
+            if (!stack.isEmpty()) moved = moveItemStackTo(stack, UPGRADE_START, upgradeEnd, false) || moved;
             if (!stack.isEmpty()) moved = moveItemStackTo(stack, STORAGE_START, STORAGE_END, false) || moved;
             if (!moved) return ItemStack.EMPTY;
         }
@@ -254,6 +269,9 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     }
 
     public BlockPos getPos() { return pos; }
+
+    /** Le vendeur est une entité tierce (pillager…) : slot Kit de garde utile. */
+    public boolean isModdedVendor() { return moddedVendor; }
 
     public String getShopName() { return shopName; }
 }

@@ -154,6 +154,11 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         boolean up = currentTab == TAB_UPGRADE;
         for (int i = ShopConfigMenu.UPGRADE_START; i < ShopConfigMenu.UPGRADE_START + ShopConfigMenu.UPGRADE_COUNT; i++)
             ((UpgradeSlot) menu.slots.get(i)).setVisible(up);
+        // Slot Kit de garde : seulement si un mod tiers (PillagerControl) est
+        // chargé ET que le vendeur du comptoir est une de ses entités.
+        boolean guardKitSlot = up && menu.isModdedVendor()
+                && net.neoforged.fml.ModList.get().isLoaded("pillagercontrol");
+        ((UpgradeSlot) menu.slots.get(ShopConfigMenu.UPGRADE_START + 6)).setVisible(guardKitSlot);
 
         // Modules conditionnels (visibles seulement si l'upgrade correspondant est posé)
         boolean shop = currentTab == TAB_SHOP;
@@ -315,14 +320,24 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         drawScroller(gg, leftPos + CO_SB_X, topPos + CO_Y, CO_VISIBLE * CO_ROW_H, coownerScroll, max);
     }
 
-    /** Coffre grisé indiquant ce qu'on peut déposer (façon lapis de la table d'enchantement). */
+    /**
+     * Item grisé indiquant ce qu'on peut déposer (façon lapis de la table
+     * d'enchantement). Le dernier (Kit de garde) n'existe que si
+     * PillagerControl est installé : résolu par id, sinon slot sans indice.
+     */
     private static final ItemStack[] UPGRADE_HINTS = {
             new ItemStack(Items.NETHER_STAR), new ItemStack(Items.PRISMARINE_SHARD), new ItemStack(Items.LIGHTNING_ROD),
-            new ItemStack(Items.BOOKSHELF), new ItemStack(Items.GOLD_BLOCK), new ItemStack(Items.OBSIDIAN)};
+            new ItemStack(Items.BOOKSHELF), new ItemStack(Items.GOLD_BLOCK), new ItemStack(Items.OBSIDIAN),
+            new ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM
+                    .get(com.villagershop.block.ShopBlockEntity.GUARD_KIT_ID))};
 
     private void renderGhostUpgrades(GuiGraphics gg) {
-        for (int i = 0; i < ShopConfigMenu.UPGRADE_COUNT; i++) {
-            if (menu.slots.get(ShopConfigMenu.UPGRADE_START + i).hasItem()) continue;
+        int count = Math.min(ShopConfigMenu.UPGRADE_COUNT,
+                Math.min(UPGRADE_HINTS.length, ShopConfigMenu.UPGRADE_XS.length));
+        for (int i = 0; i < count; i++) {
+            var slot = menu.slots.get(ShopConfigMenu.UPGRADE_START + i);
+            // slot masqué (ex. Kit de garde sans vendeur pillager) : pas d'indice
+            if (slot.hasItem() || !slot.isActive() || UPGRADE_HINTS[i].isEmpty()) continue;
             int x = leftPos + ShopConfigMenu.UPGRADE_XS[i];
             int y = topPos + ShopConfigMenu.UPGRADE_YS[i];
             gg.renderItem(UPGRADE_HINTS[i], x, y);

@@ -44,6 +44,10 @@ public record OpenSubScreenPacket(BlockPos pos, boolean stock) implements Custom
             player.openMenu(be, buf -> {
                 buf.writeBlockPos(msg.pos);
                 buf.writeUtf(be.getShopName());
+                // Vendeur tiers (pillager…) : débloque le slot Kit de garde.
+                var vendor = be.findShopkeeper();
+                buf.writeBoolean(vendor != null
+                        && !(vendor instanceof net.minecraft.world.entity.npc.Villager));
             });
         }
     }

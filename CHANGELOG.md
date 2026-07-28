@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.3 — 1.21.1 (NeoForge)
+- Nouveau slot d'amélioration **Kit de garde** (visible uniquement si PillagerControl est installé et qu'un pillager tient le comptoir) : le vendeur pillager riposte à l'arbalète quand il est attaqué.
+- Immortalité (Nether Star) compatible avec la riposte : le vendeur armé est protégé par annulation des dégâts, il sait toujours qui l'attaque.
+- Le contrôle de déplacement (prismarine/améthyste) est suspendu quand le vendeur part manger à son Mess (tag `villagershop_vendor_busy`).
+- Fix : le shift-clic ne peut plus envoyer d'item dans le slot Kit de garde masqué.
+
 All notable changes to VillagerShop are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 

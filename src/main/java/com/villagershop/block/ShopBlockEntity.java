@@ -27,6 +27,7 @@ import net.minecraft.world.item.component.WrittenBookContent;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -94,8 +95,18 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         }
     };
 
-    /** Améliorations : 0=Nether Star, 1=déplacement, 2=comm, 3=mémoire, 4=accès, 5=anti-explosion. */
-    private final ItemStackHandler upgrades = new ItemStackHandler(6) {
+    /** Nombre de slots d'amélioration (le 7e est réservé au Kit de garde). */
+    public static final int UPGRADE_SLOTS = 7;
+
+    /** Item du Kit de garde de PillagerControl (dépendance douce, par id). */
+    public static final ResourceLocation GUARD_KIT_ID =
+            ResourceLocation.fromNamespaceAndPath("pillagercontrol", "guard_kit");
+
+    /**
+     * Améliorations : 0=Nether Star, 1=déplacement, 2=comm, 3=mémoire, 4=accès,
+     * 5=anti-explosion, 6=Kit de garde (vendeur pillager uniquement).
+     */
+    private final ItemStackHandler upgrades = new ItemStackHandler(UPGRADE_SLOTS) {
         @Override
         public int getSlotLimit(int slot) {
             return 1;
@@ -110,6 +121,9 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
                 case 3 -> stack.is(Items.BOOKSHELF);
                 case 4 -> stack.is(Items.GOLD_BLOCK);
                 case 5 -> stack.is(Items.OBSIDIAN);
+                // Kit de garde : seulement si PillagerControl est installé.
+                case 6 -> net.minecraft.core.registries.BuiltInRegistries.ITEM
+                        .getKey(stack.getItem()).equals(GUARD_KIT_ID);
                 default -> false;
             };
         }
@@ -121,14 +135,14 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
 
         @Override
         public void deserializeNBT(HolderLookup.Provider provider, CompoundTag nbt) {
-            // Taille fixe (6) : on ignore le "Size" d'anciennes sauvegardes
+            // Taille fixe : on ignore le "Size" d'anciennes sauvegardes
             // pour ne pas rétrécir le handler et planter à l'ajout des slots récents.
-            setSize(6);
+            setSize(UPGRADE_SLOTS);
             ListTag items = nbt.getList("Items", Tag.TAG_COMPOUND);
             for (int i = 0; i < items.size(); i++) {
                 CompoundTag it = items.getCompound(i);
                 int slot = it.getInt("Slot");
-                if (slot >= 0 && slot < 6) setStackInSlot(slot, ItemStack.parseOptional(provider, it));
+                if (slot >= 0 && slot < UPGRADE_SLOTS) setStackInSlot(slot, ItemStack.parseOptional(provider, it));
             }
         }
     };
@@ -199,6 +213,9 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
 
     /** Obsidienne : le comptoir résiste aux explosions. */
     public boolean hasBlastProtection() { return !upgrades.getStackInSlot(5).isEmpty(); }
+
+    /** Kit de garde posé : un vendeur pillager riposte à l'arbalète s'il est attaqué. */
+    public boolean hasGuardKit() { return !upgrades.getStackInSlot(6).isEmpty(); }
 
     /** Casse autorisée : proprio/co-proprios (mêmes règles que l'accès config) ou joueur en créatif. */
     public boolean canBreak(Player player) {
@@ -789,11 +806,62 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         return "villagershop_vendor_" + pos.asLong();
     }
 
+    /**
+     * Tag posé par le mod tiers pendant que son vendeur est occupé ailleurs
+     * (ex. un pillager parti manger à son Mess) : le comptoir suspend alors
+     * tout contrôle de déplacement, même en mode prismarine/améthyste.
+     */
+    public static final String VENDOR_BUSY_TAG = "villagershop_vendor_busy";
+
+    /**
+     * Tag posé par le comptoir quand le Kit de garde est installé : le mod
+     * tiers l'interprète comme "ce vendeur a le droit de riposter".
+     */
+    public static final String VENDOR_ARMED_TAG = "villagershop_vendor_armed";
+
+    /**
+     * Vendeur armé ET immortel : protégé par annulation des dégâts plutôt que
+     * par invulnérabilité, pour que la détection de l'agresseur (et donc la
+     * riposte) continue de fonctionner.
+     */
+    public static final String VENDOR_SHIELDED_TAG = "villagershop_vendor_shielded";
+
     private void applyToVillager(Level level, BlockPos pos, BlockState state) {
         net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(pos).inflate(16.0);
         for (net.minecraft.world.entity.Mob v : level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, box)) {
             if (!isThisVendor(v, level, pos)) continue;
-            v.setInvulnerable(isImmortal());
+            // Kit de garde : on signale au mod tiers que ce vendeur peut riposter.
+            boolean armed = false;
+            if (!(v instanceof Villager)) {
+                if (hasGuardKit()) {
+                    armed = true;
+                    if (!v.getTags().contains(VENDOR_ARMED_TAG)) v.addTag(VENDOR_ARMED_TAG);
+                } else {
+                    v.removeTag(VENDOR_ARMED_TAG);
+                }
+            }
+
+            // Immortalité : un vendeur armé ne passe PAS par setInvulnerable
+            // (qui étoufferait les événements de dégâts, donc la riposte).
+            // Il est protégé par annulation des dégâts (tag "shielded", voir
+            // VillagerInteractHandler.onIncomingDamage) : intuable, mais il
+            // sait toujours QUI l'attaque.
+            if (armed && isImmortal()) {
+                v.setInvulnerable(false);
+                if (!v.getTags().contains(VENDOR_SHIELDED_TAG)) v.addTag(VENDOR_SHIELDED_TAG);
+            } else {
+                v.removeTag(VENDOR_SHIELDED_TAG);
+                v.setInvulnerable(isImmortal());
+            }
+
+            // Vendeur occupé (parti manger…) : aucun contrôle de déplacement,
+            // sinon on l'empêcherait d'aller se nourrir.
+            if (v.getTags().contains(VENDOR_BUSY_TAG)) {
+                if (v.isNoAi()) v.setNoAi(false);
+                v.clearRestriction();
+                continue;
+            }
+
             switch (getMovementMode()) {
                 case STATIC -> {
                     net.minecraft.core.Direction facing = state.getValue(ShopBlock.FACING);
@@ -842,9 +910,12 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
                 villager.setVillagerData(villager.getVillagerData().setProfession(net.minecraft.world.entity.npc.VillagerProfession.NONE));
                 villager.getBrain().eraseMemory(MemoryModuleType.JOB_SITE);
             } else {
-                // vendeur tiers : on retire simplement son tag de liaison,
+                // vendeur tiers : on retire simplement ses tags de liaison,
                 // son mod d'origine gère la suite (perte de métier, etc.)
                 v.removeTag(vendorTag(pos));
+                v.removeTag(VENDOR_ARMED_TAG);
+                v.removeTag(VENDOR_SHIELDED_TAG);
+                v.setInvulnerable(false);
             }
         }
     }

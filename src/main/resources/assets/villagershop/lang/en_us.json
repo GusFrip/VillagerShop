@@ -87,5 +87,6 @@
   "message.villagershop.transfer_received": "%s transferred the shop \"%s\" to you",
   "message.villagershop.transfer_fail": "Transfer failed — player must be a co-owner",
   "message.villagershop.protected": "This counter belongs to someone — you can't break it",
-  "book.villagershop.guide.e6.p9": "$(l)Blast protection upgrade$() — $(item)Obsidian$():$(br2)the counter resists explosions (creepers, TNT).$(br2)Note: an owned counter can only be $(l)broken$() by its owner or co-owners (creative players bypass this)."
+  "book.villagershop.guide.e6.p9": "$(l)Blast protection upgrade$() — $(item)Obsidian$():$(br2)the counter resists explosions (creepers, TNT).$(br2)Note: an owned counter can only be $(l)broken$() by its owner or co-owners (creative players bypass this).",
+  "gui.villagershop.upgrade.guard_kit": "Guard Kit: the pillager vendor shoots back with his crossbow when attacked"
 }

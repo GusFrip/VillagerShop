@@ -31,6 +31,23 @@ import java.util.Optional;
  */
 public class VillagerInteractHandler {
 
+    /**
+     * Vendeur "shielded" (armé + immortel) : les dégâts sont annulés au lieu
+     * de passer par setInvulnerable, pour que lastHurtByMob soit renseigné et
+     * que le mod tiers puisse déclencher la riposte. Les dégâts qui percent
+     * l'invulnérabilité vanilla (/kill, vide) passent quand même.
+     */
+    @SubscribeEvent
+    public void onIncomingDamage(net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent event) {
+        var entity = event.getEntity();
+        if (!entity.getTags().contains(ShopBlockEntity.VENDOR_SHIELDED_TAG)) return;
+        if (event.getSource().is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) return;
+        if (event.getSource().getEntity() instanceof net.minecraft.world.entity.LivingEntity attacker) {
+            entity.setLastHurtByMob(attacker); // mémorise l'agresseur pour la riposte
+        }
+        event.setCanceled(true);
+    }
+
     @SubscribeEvent
     public void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
         if (!(event.getTarget() instanceof net.minecraft.world.entity.Mob mob)) return;

@@ -127,6 +127,10 @@ public class ShopBlock extends Block implements EntityBlock {
                     ((ServerPlayer) player).openMenu(be, buf -> {
                         buf.writeBlockPos(pos);
                         buf.writeUtf(be.getShopName());
+                        // Vendeur tiers (pillager…) : débloque le slot Kit de garde.
+                        var vendor = be.findShopkeeper();
+                        buf.writeBoolean(vendor != null
+                                && !(vendor instanceof net.minecraft.world.entity.npc.Villager));
                     });
                 } else {
                     player.displayClientMessage(Component.translatable("message.villagershop.not_owner"), true);
