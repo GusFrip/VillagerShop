@@ -88,5 +88,8 @@
   "message.villagershop.transfer_fail": "Transfert impossible — le joueur doit être co-propriétaire",
   "message.villagershop.protected": "Ce comptoir appartient à quelqu'un — tu ne peux pas le casser",
   "book.villagershop.guide.e6.p9": "$(l)Upgrade anti-explosion$() — $(item)Obsidienne$() :$(br2)le comptoir résiste aux explosions (creepers, TNT).$(br2)Note : un comptoir qui a un proprio ne peut être $(l)cassé$() que par son proprio ou ses co-proprios (les joueurs en créatif passent outre).",
-  "gui.villagershop.upgrade.guard_kit": "Kit de garde : le vendeur pillager riposte à l'arbalète s'il est attaqué"
+  "gui.villagershop.upgrade.guard_kit": "Kit de garde : le vendeur pillager riposte à l'arbalète s'il est attaqué",
+  "book.villagershop.guide.e8.name": "Un pillager à la boutique",
+  "book.villagershop.guide.e8.p1": "Avec $(bold)PillagerControl$() installé, un $(bold)pillager pacifié$() peut tenir ton comptoir : amène-le à côté (Potion d'emprise, laisse), il enfile son tablier de boutiquier et vend exactement comme un villageois.$(br2)Clic droit sur lui : l'écran de troc. Pense à le nourrir — il mange au Mess comme tout travailleur, et le comptoir le laisse partir manger même avec le module Mouvement.",
+  "book.villagershop.guide.e8.p2": "Quand un pillager tient la boutique, l'onglet Améliorations affiche un $(bold)slot supplémentaire$() : glisses-y un $(item)Kit de garde$() (PillagerControl) et ton vendeur $(bold)riposte à l'arbalète$() quand on l'attaque — sans jamais viser joueurs ni villageois.$(br2)Combiné à la $(item)Nether Star$(), il devient une sentinelle intuable qui connaît ses agresseurs. Attention : un vendeur armé peut être pris pour cible par les monstres qu'il combat."
 }

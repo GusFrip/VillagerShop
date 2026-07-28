@@ -1,0 +1,17 @@
+{
+  "name": "book.villagershop.guide.e8.name",
+  "icon": "pillagercontrol:guard_kit",
+  "category": "villagershop:main",
+  "flag": "mod:pillagercontrol",
+  "sortnum": 7,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e8.p1"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e8.p2"
+    }
+  ]
+}

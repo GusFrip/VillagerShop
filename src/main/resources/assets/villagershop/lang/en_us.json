@@ -88,5 +88,8 @@
   "message.villagershop.transfer_fail": "Transfer failed — player must be a co-owner",
   "message.villagershop.protected": "This counter belongs to someone — you can't break it",
   "book.villagershop.guide.e6.p9": "$(l)Blast protection upgrade$() — $(item)Obsidian$():$(br2)the counter resists explosions (creepers, TNT).$(br2)Note: an owned counter can only be $(l)broken$() by its owner or co-owners (creative players bypass this).",
-  "gui.villagershop.upgrade.guard_kit": "Guard Kit: the pillager vendor shoots back with his crossbow when attacked"
+  "gui.villagershop.upgrade.guard_kit": "Guard Kit: the pillager vendor shoots back with his crossbow when attacked",
+  "book.villagershop.guide.e8.name": "A pillager behind the counter",
+  "book.villagershop.guide.e8.p1": "With $(bold)PillagerControl$() installed, a $(bold)pacified pillager$() can run your counter: bring him next to it (Potion of Thrall, lead) and he puts on his shopkeeper outfit, trading exactly like a villager.$(br2)Right-click him for the trade screen. Keep him fed — he eats at his Mess like any worker, and the counter lets him leave for meals even with the Movement upgrade.",
+  "book.villagershop.guide.e8.p2": "When a pillager runs the shop, the Upgrades tab shows an $(bold)extra slot$(): drop a $(item)Guard Kit$() (PillagerControl) in it and your vendor $(bold)shoots back with his crossbow$() when attacked — never targeting players or villagers.$(br2)Combined with the $(item)Nether Star$(), he becomes an unkillable sentry that knows its attackers. Beware: an armed vendor can be targeted by the monsters he fights."
 }
