@@ -39,6 +39,8 @@ public class ModNetwork {
                 SaveActionPacket::encode, SaveActionPacket::decode, SaveActionPacket::handle);
         CHANNEL.registerMessage(id++, TransferOwnerPacket.class,
                 TransferOwnerPacket::encode, TransferOwnerPacket::decode, TransferOwnerPacket::handle);
+        CHANNEL.registerMessage(id++, SyncStatsPacket.class,
+                SyncStatsPacket::encode, SyncStatsPacket::decode, SyncStatsPacket::handle);
     }
 
     public static void sendToServer(Object msg) {

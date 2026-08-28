@@ -90,6 +90,14 @@ public class ShopMerchant implements Merchant {
         if (be.getLevel() instanceof net.minecraft.server.level.ServerLevel sl) {
             sl.playSound(null, be.getBlockPos(), getNotifyTradeSound(),
                     net.minecraft.sounds.SoundSource.NEUTRAL, 1.0F, 1.0F);
+            // Comptabilité : les boutiques équipées de l'upgrade Communication
+            // enregistrent la vente dans le Registre des ventes (ShopSalesStats).
+            if (be.hasNotifier()) {
+                java.util.List<ItemStack> received = new java.util.ArrayList<>();
+                received.add(offer.getCostA().copy());
+                if (!offer.getCostB().isEmpty()) received.add(offer.getCostB().copy());
+                com.villagershop.stats.ShopSalesStats.recordTrade(sl, be, offer.getResult().copy(), received);
+            }
         }
     }
 

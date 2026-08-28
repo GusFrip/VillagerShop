@@ -22,6 +22,13 @@ public class ModBlocks {
                     .sound(SoundType.WOOD)
                     .noOcclusion()));
 
+    public static final RegistryObject<Block> SALES_LEDGER = BLOCKS.register("sales_ledger",
+            () -> new com.villagershop.block.LedgerBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.WOOD)
+                    .strength(2.0F)
+                    .sound(SoundType.WOOD)
+                    .noOcclusion()));
+
     public static void register(IEventBus bus) {
         BLOCKS.register(bus);
     }

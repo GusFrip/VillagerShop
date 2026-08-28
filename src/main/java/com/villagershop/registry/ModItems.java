@@ -19,6 +19,9 @@ public class ModItems {
     public static final RegistryObject<Item> GUIDE = ITEMS.register("guide",
             () -> new GuideItem(new Item.Properties().stacksTo(1)));
 
+    public static final RegistryObject<Item> SALES_LEDGER_ITEM = ITEMS.register("sales_ledger",
+            () -> new BlockItem(ModBlocks.SALES_LEDGER.get(), new Item.Properties()));
+
     public static void register(IEventBus bus) {
         ITEMS.register(bus);
     }
