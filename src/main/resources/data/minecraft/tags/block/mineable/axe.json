@@ -1,6 +1,7 @@
 {
   "replace": false,
   "values": [
-    "villagershop:shop_counter"
+    "villagershop:shop_counter",
+    "villagershop:sales_ledger"
   ]
 }

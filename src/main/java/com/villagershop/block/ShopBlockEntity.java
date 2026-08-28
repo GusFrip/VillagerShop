@@ -351,7 +351,14 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
     }
 
     private void onUpgradeChanged() {
-        if (level != null && !level.isClientSide) ejectOverflow();
+        if (level != null && !level.isClientSide) {
+            ejectOverflow();
+            // L'upgrade Communication vient peut-être d'être posée : on enregistre
+            // la boutique au Registre des ventes pour qu'elle apparaisse même à 0 vente.
+            if (hasNotifier() && level instanceof net.minecraft.server.level.ServerLevel sl) {
+                com.villagershop.stats.ShopSalesStats.touch(sl, this);
+            }
+        }
         setChanged();
     }
 
@@ -391,10 +398,20 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         return hasAccess() && allowed.contains(player.getUUID());
     }
 
+
+    /** Resynchronise immédiatement les viewers de la fiche du Registre des ventes
+     *  (appelé à chaque changement de propriété, pour ne pas attendre la prochaine vente). */
+    private void syncLedgerViewers() {
+        if (level instanceof net.minecraft.server.level.ServerLevel sl && hasNotifier()) {
+            com.villagershop.stats.ShopSalesStats.touch(sl, this);
+        }
+    }
+
     public void addAllowed(UUID uuid, String name) {
         if (owner != null && owner.equals(uuid)) return;
         allowed.add(uuid);
         if (name != null) nameCache.put(uuid, name);
+        syncLedgerViewers();
         setChanged();
     }
 
@@ -405,12 +422,14 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         allowed.remove(newOwner);
         if (owner != null) allowed.add(owner);
         owner = newOwner;
+        syncLedgerViewers();
         setChanged();
         return true;
     }
 
     public void removeAllowed(UUID uuid) {
         allowed.remove(uuid);
+        syncLedgerViewers();
         setChanged();
     }
 

@@ -26,6 +26,7 @@ public class ModNetwork {
         // S2C
         registrar.playToClient(SyncAllowedPacket.TYPE, SyncAllowedPacket.STREAM_CODEC, SyncAllowedPacket::handle);
         registrar.playToClient(SyncOffersPacket.TYPE, SyncOffersPacket.STREAM_CODEC, SyncOffersPacket::handle);
+        registrar.playToClient(SyncStatsPacket.TYPE, SyncStatsPacket.STREAM_CODEC, SyncStatsPacket::handle);
     }
 
     public static void sendToServer(CustomPacketPayload msg) {

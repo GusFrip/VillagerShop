@@ -19,6 +19,7 @@ public class ModCreativeTabs {
                     .icon(() -> new ItemStack(ModItems.SHOP_COUNTER_ITEM.get()))
                     .displayItems((params, output) -> {
                         output.accept(ModItems.SHOP_COUNTER_ITEM.get());
+                        output.accept(ModItems.SALES_LEDGER_ITEM.get());
                         output.accept(ModItems.GUIDE.get());
                     })
                     .build());

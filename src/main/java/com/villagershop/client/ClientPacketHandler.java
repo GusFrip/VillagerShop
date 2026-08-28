@@ -18,4 +18,9 @@ public class ClientPacketHandler {
             screen.setOffers(offers, selected);
         }
     }
+
+    /** Ouvre l'écran Registre des ventes avec l'instantané reçu du serveur. */
+    public static void handleSyncStats(List<com.villagershop.stats.ShopStatSnapshot> shops) {
+        Minecraft.getInstance().setScreen(new LedgerScreen(shops));
+    }
 }

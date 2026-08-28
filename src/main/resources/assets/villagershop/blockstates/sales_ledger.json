@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "villagershop:block/sales_ledger"
+    },
+    "facing=east": {
+      "model": "villagershop:block/sales_ledger",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "villagershop:block/sales_ledger",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "villagershop:block/sales_ledger",
+      "y": 270
+    }
+  }
+}
