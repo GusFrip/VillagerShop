@@ -131,7 +131,13 @@ public class ShopBlock extends Block implements EntityBlock {
     protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean movedByPiston) {
         if (!state.is(newState.getBlock())) {
             if (level.getBlockEntity(pos) instanceof ShopBlockEntity be) {
-                if (!level.isClientSide) be.revertVillager(level, pos);
+                if (!level.isClientSide) {
+                    be.revertVillager(level, pos);
+                    // Historique conservé mais boutique marquée retirée dans le Registre.
+                    if (level instanceof net.minecraft.server.level.ServerLevel sl) {
+                        com.villagershop.stats.ShopSalesStats.markRemoved(sl, pos);
+                    }
+                }
                 be.dropContents();
             }
             super.onRemove(state, level, pos, newState, movedByPiston);

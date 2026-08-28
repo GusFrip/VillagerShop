@@ -24,6 +24,7 @@ public class ModNetwork {
         // S2C
         PayloadTypeRegistry.playS2C().register(SyncAllowedPacket.TYPE, SyncAllowedPacket.STREAM_CODEC);
         PayloadTypeRegistry.playS2C().register(SyncOffersPacket.TYPE, SyncOffersPacket.STREAM_CODEC);
+        PayloadTypeRegistry.playS2C().register(SyncStatsPacket.TYPE, SyncStatsPacket.STREAM_CODEC);
 
         ServerPlayNetworking.registerGlobalReceiver(BuyOfferPacket.TYPE, (msg, ctx) -> BuyOfferPacket.handle(msg, ctx.player()));
         ServerPlayNetworking.registerGlobalReceiver(ManageAllowedPacket.TYPE, (msg, ctx) -> ManageAllowedPacket.handle(msg, ctx.player()));

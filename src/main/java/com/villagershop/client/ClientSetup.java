@@ -25,6 +25,8 @@ public class ClientSetup implements ClientModInitializer {
         // Receveurs S2C : les handlers Fabric tournent sur le thread client.
         ClientPlayNetworking.registerGlobalReceiver(SyncAllowedPacket.TYPE, (msg, ctx) -> SyncAllowedPacket.handleClient(msg));
         ClientPlayNetworking.registerGlobalReceiver(SyncOffersPacket.TYPE, (msg, ctx) -> SyncOffersPacket.handleClient(msg));
+        ClientPlayNetworking.registerGlobalReceiver(com.villagershop.network.SyncStatsPacket.TYPE,
+                (msg, ctx) -> com.villagershop.network.SyncStatsPacket.handleClient(msg));
 
         // Couche qui masque le badge de niveau du villageois "shopkeeper"
         LivingEntityFeatureRendererRegistrationCallback.EVENT.register((entityType, renderer, helper, context) -> {

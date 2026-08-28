@@ -17,8 +17,16 @@ public class ModBlocks {
             .sound(SoundType.WOOD)
             .noOcclusion());
 
+    public static final Block SALES_LEDGER = new com.villagershop.block.LedgerBlock(BlockBehaviour.Properties.of()
+            .mapColor(MapColor.WOOD)
+            .strength(2.0F)
+            .sound(SoundType.WOOD)
+            .noOcclusion());
+
     public static void register() {
         Registry.register(BuiltInRegistries.BLOCK,
                 ResourceLocation.fromNamespaceAndPath(ShopMod.MOD_ID, "shop_counter"), SHOP_COUNTER);
+        Registry.register(BuiltInRegistries.BLOCK,
+                ResourceLocation.fromNamespaceAndPath(ShopMod.MOD_ID, "sales_ledger"), SALES_LEDGER);
     }
 }
