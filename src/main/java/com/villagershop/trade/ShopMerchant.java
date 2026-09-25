@@ -23,6 +23,8 @@ public class ShopMerchant implements Merchant {
     @Nullable
     private Player tradingPlayer;
     private MerchantOffers offers;
+    /** MerchantOffer -> offre boutique d'origine (pour retrouver le drapeau illimité). */
+    private final java.util.Map<MerchantOffer, ShopOffer> origin = new java.util.IdentityHashMap<>();
 
     public ShopMerchant(ShopBlockEntity be) {
         this.be = be;
@@ -41,14 +43,16 @@ public class ShopMerchant implements Merchant {
             ItemStack pa = o.getPriceA().copy();
             ItemStack pb = o.getPriceB().copy();
             if (pa.isEmpty() && !pb.isEmpty()) { pa = pb; pb = ItemStack.EMPTY; }
-            list.add(new MerchantOffer(
+            MerchantOffer mo = new MerchantOffer(
                     pa,
                     pb,
                     o.getResult().copy(),
                     0,                       // uses
                     Math.max(0, avail),      // maxUses = nb d'achats possibles selon le stock
                     0,                       // xp
-                    0.0F));                  // priceMultiplier
+                    0.0F);                   // priceMultiplier
+            origin.put(mo, o);
+            list.add(mo);
         }
         return list;
     }
@@ -80,7 +84,11 @@ public class ShopMerchant implements Merchant {
         offer.increaseUses();
         // Retirer la marchandise du stock D'ABORD : ça libère la place que la
         // simulation maxTrades suppose disponible pour encaisser le paiement.
-        be.removeFromStock(offer.getResult(), offer.getResult().getCount());
+        // Mode admin illimité : la marchandise n'est jamais prélevée du stock.
+        ShopOffer src = origin.get(offer);
+        if (src == null || !be.isInfinite(src)) {
+            be.removeFromStock(offer.getResult(), offer.getResult().getCount());
+        }
         // Encaisser le paiement dans le stock
         be.depositToStock(offer.getCostA().copy());
         if (!offer.getCostB().isEmpty()) {

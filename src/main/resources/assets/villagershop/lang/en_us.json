@@ -105,5 +105,7 @@
   "gui.villagershop.ledger.sum_shops": "Communicating shops",
   "gui.villagershop.ledger.sum_active": "Active shops",
   "gui.villagershop.ledger.sum_sold": "Items sold (all time)",
-  "gui.villagershop.ledger.sum_received": "Items received (all time)"
+  "gui.villagershop.ledger.sum_received": "Items received (all time)",
+  "gui.villagershop.infinite_on": "Unlimited stock: ON (admin) — goods are never taken from storage",
+  "gui.villagershop.infinite_off": "Unlimited stock: OFF — click to serve this offer without consuming stock"
 }
