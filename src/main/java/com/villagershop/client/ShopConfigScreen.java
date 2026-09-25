@@ -4,6 +4,7 @@ import com.villagershop.ShopMod;
 import com.villagershop.data.ShopOffer;
 import com.villagershop.menu.ChestUpgradeSlot;
 import com.villagershop.menu.DynamicStorageSlot;
+import com.villagershop.block.ShopBlockEntity;
 import com.villagershop.menu.ShopConfigMenu;
 import com.villagershop.menu.ToggleGhostSlot;
 import com.villagershop.menu.TradeUpgradeSlot;
@@ -42,6 +43,10 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
             ResourceLocation.fromNamespaceAndPath(ShopMod.MOD_ID, "textures/gui/tab.png");
 
     private static final int TAB_SHOP = 0, TAB_TRADE = 1, TAB_STOCK = 2, TAB_UPGRADE = 3;
+    /** Bouton ∞ (mode admin) : 2 états empilés de 14x12 (OFF en haut, ON en bas). */
+    private static final ResourceLocation TOGGLE_TEX =
+            ResourceLocation.fromNamespaceAndPath(ShopMod.MOD_ID, "textures/gui/infinite_toggle.png");
+    private static final int TOGGLE_W = 14, TOGGLE_H = 12;
     private static final int PANEL_TOP = 20;
     private static final int TAB_X = 0, TAB_Y = 0, TAB_W = 28, TAB_H = 20, TAB_GAP = 29;
     private static final ItemStack[] TAB_ICONS = {
@@ -115,6 +120,7 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
     private boolean hasCommClient()   { return upgradePresent(2); }
     private boolean hasMemoryClient() { return upgradePresent(3); }
     private boolean hasAccessClient() { return upgradePresent(4); }
+    private boolean hasAdminClient()  { return upgradePresent(ShopBlockEntity.ADMIN_SLOT); }
 
     private void addCoowner() {
         String name = coownerField.getValue().trim();
@@ -152,8 +158,12 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         for (int i = ShopConfigMenu.STORAGE_START; i < ShopConfigMenu.STORAGE_END; i++)
             ((DynamicStorageSlot) menu.slots.get(i)).setTabVisible(stock);
         boolean up = currentTab == TAB_UPGRADE;
-        for (int i = ShopConfigMenu.UPGRADE_START; i < ShopConfigMenu.UPGRADE_START + ShopConfigMenu.UPGRADE_COUNT; i++)
+        for (int i = ShopConfigMenu.UPGRADE_START; i < ShopConfigMenu.ADMIN_SLOT_INDEX; i++)
             ((UpgradeSlot) menu.slots.get(i)).setVisible(up);
+        // Slot admin caché : n'apparaît que s'il est déjà occupé ou qu'un bloc de commande est au curseur.
+        boolean adminVisible = up && (menu.slots.get(ShopConfigMenu.ADMIN_SLOT_INDEX).hasItem()
+                || menu.getCarried().is(Items.COMMAND_BLOCK));
+        ((UpgradeSlot) menu.slots.get(ShopConfigMenu.ADMIN_SLOT_INDEX)).setVisible(adminVisible);
 
         // Modules conditionnels (visibles seulement si l'upgrade correspondant est posé)
         boolean shop = currentTab == TAB_SHOP;
@@ -200,7 +210,7 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
             for (int i = 0; i < menu.getTradeCount(); i++) {
                 int base = (i / ShopConfigMenu.OFFER_ROWS == 0) ? ShopConfigMenu.COL0_X : ShopConfigMenu.COL1_X;
                 int y = ShopConfigMenu.OFFER_Y0 + (i % ShopConfigMenu.OFFER_ROWS) * ShopConfigMenu.OFFER_DY + 4;
-                gg.drawString(font, "→", base + 50, y, 0x555555, false);
+                gg.drawString(font, "→", base + ShopConfigMenu.OFF_ARROW_DX, y, 0x555555, false);
             }
             Component cnt = Component.translatable("gui.villagershop.offers_count",
                     menu.getTradeCount(), ShopConfigMenu.OFFERS);
@@ -226,8 +236,8 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         renderTabs(gg);
         if (currentTab == TAB_SHOP && hasAccessClient()) renderCoownerList(gg, mouseX, mouseY);
         else if (currentTab == TAB_STOCK) { renderStorageScrollbar(gg); renderLockedStock(gg, mouseX, mouseY); }
-        else if (currentTab == TAB_UPGRADE) { renderGhostUpgrades(gg); renderGhostChest(gg); renderGhostTrade(gg); renderGhostSave(gg); }
-        else if (currentTab == TAB_TRADE) renderLockedOffers(gg, mouseX, mouseY);
+        else if (currentTab == TAB_UPGRADE) { renderGhostUpgrades(gg); renderGhostAdmin(gg); renderGhostChest(gg); renderGhostTrade(gg); renderGhostSave(gg); }
+        else if (currentTab == TAB_TRADE) { renderInfiniteToggles(gg, mouseX, mouseY); renderLockedOffers(gg, mouseX, mouseY); }
         renderTabTooltips(gg, mouseX, mouseY);
         renderTooltip(gg, mouseX, mouseY);
     }
@@ -257,6 +267,36 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         if (menu.slots.get(ShopConfigMenu.TRADE_SLOT_INDEX).hasItem()) return;
         ghostIcon(gg, new ItemStack(Items.EMERALD_BLOCK),
                 leftPos + ShopConfigMenu.TRADE_SLOT_X, topPos + ShopConfigMenu.TRADE_SLOT_Y);
+    }
+
+    /** Slot admin caché : indice fantôme (bloc de commande) seulement quand le slot est révélé et vide. */
+    private void renderGhostAdmin(GuiGraphics gg) {
+        var slot = menu.slots.get(ShopConfigMenu.ADMIN_SLOT_INDEX);
+        if (!slot.isActive() || slot.hasItem()) return;
+        ghostIcon(gg, new ItemStack(Items.COMMAND_BLOCK), leftPos + slot.x, topPos + slot.y);
+    }
+
+    /** Position écran du bouton ∞ de l'offre i. */
+    private int toggleX(int i) {
+        int base = (i / ShopConfigMenu.OFFER_ROWS == 0) ? ShopConfigMenu.COL0_X : ShopConfigMenu.COL1_X;
+        return leftPos + base + ShopConfigMenu.OFF_TOGGLE_DX;
+    }
+    private int toggleY(int i) {
+        return topPos + ShopConfigMenu.OFFER_Y0 + (i % ShopConfigMenu.OFFER_ROWS) * ShopConfigMenu.OFFER_DY + 2;
+    }
+
+    /** Mode admin : bouton ∞ par offre active (vert = illimité, rouge = stock normal). */
+    private void renderInfiniteToggles(GuiGraphics gg, int mouseX, int mouseY) {
+        if (!hasAdminClient()) return;
+        Component tip = null;
+        for (int i = 0; i < menu.getTradeCount(); i++) {
+            int x = toggleX(i), y = toggleY(i);
+            boolean on = menu.isInfinite(i);
+            gg.blit(TOGGLE_TEX, x, y, 0, on ? TOGGLE_H : 0, TOGGLE_W, TOGGLE_H, TOGGLE_W, TOGGLE_H * 2);
+            if (over(mouseX, mouseY, x, y, TOGGLE_W, TOGGLE_H))
+                tip = Component.translatable(on ? "gui.villagershop.infinite_on" : "gui.villagershop.infinite_off");
+        }
+        if (tip != null) gg.renderTooltip(font, tip, mouseX, mouseY);
     }
 
     /** Voile sur les offres verrouillées + tooltip explicatif. */
@@ -321,7 +361,7 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
             new ItemStack(Items.BOOKSHELF), new ItemStack(Items.GOLD_BLOCK), new ItemStack(Items.OBSIDIAN)};
 
     private void renderGhostUpgrades(GuiGraphics gg) {
-        for (int i = 0; i < ShopConfigMenu.UPGRADE_COUNT; i++) {
+        for (int i = 0; i < UPGRADE_HINTS.length; i++) {
             if (menu.slots.get(ShopConfigMenu.UPGRADE_START + i).hasItem()) continue;
             int x = leftPos + ShopConfigMenu.UPGRADE_XS[i];
             int y = topPos + ShopConfigMenu.UPGRADE_YS[i];
@@ -446,6 +486,16 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
             int track = ShopConfigMenu.VISIBLE_ROWS * 18;
             if (menu.getMaxScroll() > 0 && over(mx, my, leftPos + 172, topPos + ShopConfigMenu.STORAGE_Y, 14, track)) {
                 storageScrolling = true; dragStorage(my); return true;
+            }
+        }
+        // Boutons ∞ (mode admin) : bascule côté serveur via clickMenuButton
+        if (currentTab == TAB_TRADE && hasAdminClient()) {
+            Minecraft mc = Minecraft.getInstance();
+            for (int i = 0; i < menu.getTradeCount(); i++) {
+                if (over(mx, my, toggleX(i), toggleY(i), TOGGLE_W, TOGGLE_H)) {
+                    if (mc.gameMode != null) mc.gameMode.handleInventoryButtonClick(menu.containerId, ShopConfigMenu.TOGGLE_BUTTON_BASE + i);
+                    return true;
+                }
             }
         }
         // Slots fantômes (onglet Échanges) : on traite le clic dès l'APPUI, sans passer
