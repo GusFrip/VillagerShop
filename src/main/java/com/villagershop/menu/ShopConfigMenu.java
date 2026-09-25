@@ -36,7 +36,8 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     public static final int STORAGE_VISIBLE = VISIBLE_ROWS * 9;     // 27
     public static final int STORAGE_END = STORAGE_START + STORAGE_VISIBLE; // 52
     public static final int UPGRADE_START = STORAGE_END;            // 43 (3 slots)
-    public static final int UPGRADE_COUNT = com.villagershop.block.ShopBlockEntity.UPGRADE_SLOTS; // 7 (le 7e = Kit de garde)
+    public static final int UPGRADE_COUNT = com.villagershop.block.ShopBlockEntity.UPGRADE_SLOTS; // 8 (7e = Kit de garde, 8e = admin caché)
+    public static final int ADMIN_SLOT_INDEX = UPGRADE_START + ShopBlockEntity.ADMIN_SLOT;
     public static final int SAVE_QUILL_INDEX = UPGRADE_START + UPGRADE_COUNT;
     public static final int SAVE_SIGNED_INDEX = SAVE_QUILL_INDEX + 1;
     public static final int TRADE_SLOT_INDEX = SAVE_SIGNED_INDEX + 1;
@@ -47,13 +48,15 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     public static final int OFFER_ROWS = 4;
     public static final int OFFER_Y0 = 34, OFFER_DY = 20;
     public static final int COL0_X = 0, COL1_X = 90;
-    public static final int OFF_PRICE_A_DX = 8, OFF_PRICE_B_DX = 30, OFF_RESULT_DX = 62;
+    // Layout compact : bouton ∞ (mode admin) à gauche, puis prixA, prixB, flèche, résultat.
+    public static final int OFF_TOGGLE_DX = 4, OFF_PRICE_A_DX = 20, OFF_PRICE_B_DX = 40, OFF_RESULT_DX = 68;
+    public static final int OFF_ARROW_DX = 58;
 
     public static final int CHEST_SLOT_X = 134, CHEST_SLOT_Y = 40;
     public static final int TRADE_SLOT_X = 8, TRADE_SLOT_Y = 40;
     // rangée de 8 slots (pas de 18) : émeraude(8), 6 upgrades, coffre(134)
-    public static final int[] UPGRADE_XS = {26, 44, 62, 80, 98, 116, 26}; // immortalité, déplacement, communication, mémoire, accès, anti-explosion, kit de garde
-    public static final int[] UPGRADE_YS = {40, 40, 40, 40, 40, 40, 62};   // le kit de garde est sur une 2e rangée
+    public static final int[] UPGRADE_XS = {26, 44, 62, 80, 98, 116, 26, 152}; // immortalité, déplacement, communication, mémoire, accès, anti-explosion, kit de garde, admin (caché)
+    public static final int[] UPGRADE_YS = {40, 40, 40, 40, 40, 40, 62, 40};   // le kit de garde est sur une 2e rangée
     public static final int SAVE_QUILL_X = 8, SAVE_SIGNED_X = 30, SAVE_Y = 90;
     public static final int STORAGE_X = 8, STORAGE_Y = 62;
     public static final int PLAYER_INV_X = 8, PLAYER_INV_Y = 138;
@@ -72,6 +75,10 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     private final BlockPos pos;
     private final String shopName;
     private int scrollOffset = 0;
+    /** Drapeaux "illimité" par offre, synchronisés serveur -> client via DataSlot. */
+    private final int[] infiniteFlags = new int[OFFERS];
+    /** Id de bouton (clickMenuButton) : bascule le mode illimité de l'offre (id - TOGGLE_BUTTON_BASE). */
+    public static final int TOGGLE_BUTTON_BASE = 1000;
 
     /** Constructeur CLIENT. */
     public ShopConfigMenu(int id, Inventory inv, FriendlyByteBuf buf) {
@@ -132,6 +139,19 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
         // blocs d'émeraude : débloquent les offres (1 de base + 1 par bloc)
         addSlot(new TradeUpgradeSlot(tradeHandler, 0, TRADE_SLOT_X, TRADE_SLOT_Y));
 
+        // Sync des drapeaux illimités (un DataSlot par offre)
+        for (int i = 0; i < OFFERS; i++) {
+            final int idx = i;
+            addDataSlot(new net.minecraft.world.inventory.DataSlot() {
+                @Override public int get() {
+                    return ShopConfigMenu.this.be != null
+                            ? (ShopConfigMenu.this.be.getOffer(idx).isInfinite() ? 1 : 0)
+                            : infiniteFlags[idx];
+                }
+                @Override public void set(int v) { infiniteFlags[idx] = v; }
+            });
+        }
+
         // inventaire
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
@@ -185,8 +205,22 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
 
     @Override
     public boolean clickMenuButton(Player player, int id) {
+        if (id >= TOGGLE_BUTTON_BASE) {
+            if (be != null) be.toggleInfinite(id - TOGGLE_BUTTON_BASE);
+            return true;
+        }
         setScrollOffset(id); // défilement du stock
         return true;
+    }
+
+    /** Côté client : l'offre est-elle en mode illimité ? */
+    public boolean isInfinite(int offer) {
+        return offer >= 0 && offer < OFFERS && infiniteFlags[offer] != 0;
+    }
+
+    /** L'upgrade Admin (bloc de commande) est-elle posée ? (lisible côté client via le slot) */
+    public boolean hasAdmin() {
+        return slots.get(ADMIN_SLOT_INDEX).hasItem();
     }
 
     // ----- Offres (édition en place) --------------------------------------
@@ -226,10 +260,12 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     private void pushTemplatesToBE() {
         if (be == null) return;
         for (int i = 0; i < OFFERS; i++) {
-            be.setOffer(i, new ShopOffer(
+            ShopOffer o = new ShopOffer(
                     templates.getItem(i * 3).copy(),
                     templates.getItem(i * 3 + 1).copy(),
-                    templates.getItem(i * 3 + 2).copy()));
+                    templates.getItem(i * 3 + 2).copy());
+            o.setInfinite(be.getOffer(i).isInfinite()); // le drapeau ∞ survit à l'édition des items
+            be.setOffer(i, o);
         }
     }
 
@@ -251,8 +287,10 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
             // Le slot Kit de garde (dernier) est exclu du shift-clic quand il est
             // masqué (vendeur villageois) : sinon l'item disparaîtrait dans un
             // slot invisible.
-            int upgradeEnd = UPGRADE_START + (moddedVendor ? UPGRADE_COUNT : UPGRADE_COUNT - 1);
+            int upgradeEnd = UPGRADE_START + (moddedVendor ? ShopBlockEntity.ADMIN_SLOT : ShopBlockEntity.ADMIN_SLOT - 1);
             if (!stack.isEmpty()) moved = moveItemStackTo(stack, UPGRADE_START, upgradeEnd, false) || moved;
+            // Slot admin caché : accepte le bloc de commande au shift-clic (validation par le handler)
+            if (!stack.isEmpty() && stack.is(Items.COMMAND_BLOCK)) moved = moveItemStackTo(stack, ADMIN_SLOT_INDEX, ADMIN_SLOT_INDEX + 1, false) || moved;
             if (!stack.isEmpty()) moved = moveItemStackTo(stack, STORAGE_START, STORAGE_END, false) || moved;
             if (!moved) return ItemStack.EMPTY;
         }

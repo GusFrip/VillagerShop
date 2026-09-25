@@ -32,7 +32,7 @@ import java.util.Map;
 public class LedgerScreen extends Screen {
 
     /** Cadre de slot du screen Statistics vanilla (sprite 18x18). */
-    private static final ResourceLocation SLOT_SPRITE = ResourceLocation.withDefaultNamespace("statistics/slot");
+    private static final ResourceLocation SLOT_SPRITE = ResourceLocation.withDefaultNamespace("container/slot");
 
     private static final int LIST_TOP = 52;
     private static final int LIST_BOTTOM_MARGIN = 60;

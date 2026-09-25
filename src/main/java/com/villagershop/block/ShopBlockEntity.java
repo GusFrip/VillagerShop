@@ -96,7 +96,9 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
     };
 
     /** Nombre de slots d'amélioration (le 7e est réservé au Kit de garde). */
-    public static final int UPGRADE_SLOTS = 7;
+    public static final int UPGRADE_SLOTS = 8;
+    /** Slot admin caché (bloc de commande) : stock illimité par offre. */
+    public static final int ADMIN_SLOT = 7;
 
     /** Item du Kit de garde de PillagerControl (dépendance douce, par id). */
     public static final ResourceLocation GUARD_KIT_ID =
@@ -124,6 +126,7 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
                 // Kit de garde : seulement si PillagerControl est installé.
                 case 6 -> net.minecraft.core.registries.BuiltInRegistries.ITEM
                         .getKey(stack.getItem()).equals(GUARD_KIT_ID);
+                case ADMIN_SLOT -> stack.is(Items.COMMAND_BLOCK);
                 default -> false;
             };
         }
@@ -213,6 +216,19 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
 
     /** Obsidienne : le comptoir résiste aux explosions. */
     public boolean hasBlastProtection() { return !upgrades.getStackInSlot(5).isEmpty(); }
+
+    /** Bloc de commande (slot caché) : mode admin, les offres peuvent servir en illimité. */
+    public boolean hasAdmin() { return !upgrades.getStackInSlot(ADMIN_SLOT).isEmpty(); }
+
+    /** Une offre est réellement illimitée si son drapeau est posé ET que l'upgrade Admin est présente. */
+    public boolean isInfinite(ShopOffer offer) { return hasAdmin() && offer.isInfinite(); }
+
+    /** Bascule le mode illimité d'une offre (serveur, upgrade Admin requise). */
+    public void toggleInfinite(int index) {
+        if (index < 0 || index >= MAX_OFFERS || !hasAdmin()) return;
+        offers[index].setInfinite(!offers[index].isInfinite());
+        setChanged();
+    }
 
     /** Kit de garde posé : un vendeur pillager riposte à l'arbalète s'il est attaqué. */
     public boolean hasGuardKit() { return !upgrades.getStackInSlot(6).isEmpty(); }
@@ -325,7 +341,7 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
     public boolean hasSupplyProblem() {
         for (int i = 0; i < getActiveOfferCount(); i++) {
             ShopOffer o = offers[i];
-            if (!o.isValid()) continue;
+            if (!o.isValid() || isInfinite(o)) continue;
             if (countInStorage(o.getResult()) < o.getResult().getCount()) return true;
         }
         return false;
@@ -336,7 +352,7 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         for (int i = 0; i < getActiveOfferCount(); i++) {
             ShopOffer o = offers[i];
             if (!o.isValid()) continue;
-            if (countInStorage(o.getResult()) >= o.getResult().getCount() && maxTrades(o) == 0) return true;
+            if ((isInfinite(o) || countInStorage(o.getResult()) >= o.getResult().getCount()) && maxTrades(o) == 0) return true;
         }
         return false;
     }
@@ -562,6 +578,9 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
      * à la fois assez de marchandise en stock ET assez de place pour encaisser le(s)
      * paiement(s). On simule les transactions successives sur une copie du stock.
      */
+    /** Nombre d'achats affiché pour une offre admin gratuite et illimitée. */
+    public static final int INFINITE_TRADES = 9999;
+
     public int maxTrades(ShopOffer offer) {
         if (!offer.isValid()) return 0;
         int cap = getActiveCapacity();
@@ -577,16 +596,19 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
 
         ItemStack priceA = offer.getPriceA();
         ItemStack priceB = offer.getPriceB();
+        boolean infinite = isInfinite(offer);
+        // Mode admin illimité et gratuit : rien ne limite les achats.
+        if (infinite && priceA.isEmpty() && priceB.isEmpty()) return INFINITE_TRADES;
 
         int trades = 0;
         int safety = cap * 64 + 1;
         while (trades < safety) {
-            if (simCount(sim, offer.getResult()) < resultPer) break;
+            if (!infinite && simCount(sim, offer.getResult()) < resultPer) break;
             // copie de l'itération : on n'applique que si tout passe
             ItemStack[] next = new ItemStack[cap];
             int[] lim = new int[cap];
             for (int i = 0; i < cap; i++) { next[i] = sim[i].copy(); lim[i] = limit[i]; }
-            simRemove(next, offer.getResult(), resultPer);
+            if (!infinite) simRemove(next, offer.getResult(), resultPer);
             if (!simInsert(next, lim, priceA)) break;
             if (!priceB.isEmpty() && !simInsert(next, lim, priceB)) break;
             sim = next; limit = lim;
@@ -677,7 +699,8 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
                 && countInPlayer(player, offer.getPriceB()) < offer.getPriceB().getCount()) return false;
 
         // Marchandise retirée AVANT d'encaisser : même ordre que la simulation maxTrades.
-        extractFromStorage(offer.getResult(), offer.getResult().getCount());
+        // (Mode admin illimité : la marchandise n'est jamais prélevée du stock.)
+        if (!isInfinite(offer)) extractFromStorage(offer.getResult(), offer.getResult().getCount());
         removeFromPlayer(player, offer.getPriceA(), offer.getPriceA().getCount());
         insertIntoStorage(offer.getPriceA().copy());
         if (!offer.getPriceB().isEmpty()) {

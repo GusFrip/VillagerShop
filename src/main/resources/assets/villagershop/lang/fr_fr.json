@@ -109,5 +109,7 @@
   "gui.villagershop.ledger.sum_shops": "Boutiques communicantes",
   "gui.villagershop.ledger.sum_active": "Boutiques actives",
   "gui.villagershop.ledger.sum_sold": "Objets vendus (cumul)",
-  "gui.villagershop.ledger.sum_received": "Objets encaissés (cumul)"
+  "gui.villagershop.ledger.sum_received": "Objets encaissés (cumul)",
+  "gui.villagershop.infinite_on": "Stock illimité : ACTIVÉ (admin) — la marchandise n'est jamais prélevée du stock",
+  "gui.villagershop.infinite_off": "Stock illimité : DÉSACTIVÉ — cliquez pour servir cette offre sans consommer le stock"
 }
