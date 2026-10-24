@@ -1,6 +1,7 @@
 package com.villagershop.menu;
 
 import com.villagershop.block.ShopBlockEntity;
+import com.villagershop.config.VSConfig;
 import com.villagershop.data.ShopOffer;
 import com.villagershop.registry.ModMenus;
 import net.minecraft.core.BlockPos;
@@ -57,6 +58,25 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     // rangée de 8 slots (pas de 18) : émeraude(8), 6 upgrades, coffre(134)
     public static final int[] UPGRADE_XS = {26, 44, 62, 80, 98, 116, 152}; // immortalité, déplacement, communication, mémoire, accès, anti-explosion, admin (caché)
     public static final int[] UPGRADE_YS = {40, 40, 40, 40, 40, 40, 40};
+    /** Rangée compactée : émeraude, 6 upgrades, coffre, admin ; une upgrade désactivée par la config ne laisse pas de trou. */
+    public static final int ROW_X0 = 8, ROW_DX = 18;
+    public static final int ROW_TRADE = 0, ROW_STORAGE = 7, ROW_ADMIN = 8, ROW_SIZE = 9;
+
+    /** Abscisses de la rangée selon la config (les slots désactivés, masqués, prennent la colonne suivante). */
+    public static int[] rowXs() {
+        boolean[] on = new boolean[ROW_SIZE];
+        on[ROW_TRADE] = VSConfig.maxTradeBlocks() > 0;
+        for (int i = 0; i < ShopBlockEntity.ADMIN_SLOT; i++) on[1 + i] = VSConfig.isSlotEnabled(i);
+        on[ROW_STORAGE] = VSConfig.isEnabled(VSConfig.Upgrade.STORAGE);
+        on[ROW_ADMIN] = VSConfig.isEnabled(VSConfig.Upgrade.ADMIN);
+        int[] xs = new int[ROW_SIZE];
+        int col = 0;
+        for (int k = 0; k < ROW_SIZE; k++) {
+            xs[k] = ROW_X0 + Math.min(col, ROW_SIZE - 1) * ROW_DX;
+            if (on[k]) col++;
+        }
+        return xs;
+    }
     public static final int SAVE_QUILL_X = 8, SAVE_SIGNED_X = 30, SAVE_Y = 90;
     public static final int STORAGE_X = 8, STORAGE_Y = 62;
     public static final int PLAYER_INV_X = 8, PLAYER_INV_Y = 138;
@@ -65,6 +85,7 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     private final ShopBlockEntity be;
     private final Container templates;
     private final ItemStackHandler chestHandler;
+    private final ItemStackHandler storageHandler;
     private final ItemStackHandler upgradeHandler;
     private final ItemStackHandler tradeHandler;
     private final BlockPos pos;
@@ -103,6 +124,7 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
         this.shopName = shopName == null ? "" : shopName;
         this.templates = templates;
         this.chestHandler = chestHandler;
+        this.storageHandler = storage;
         this.upgradeHandler = upgradeHandler;
         this.tradeHandler = tradeHandler;
 
@@ -115,8 +137,10 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
             addSlot(new ToggleGhostSlot(templates, i * 3 + 2, base + OFF_RESULT_DX, y));
         }
 
+        final int[] rowX = rowXs();
+
         // coffre
-        addSlot(new ChestUpgradeSlot(chestHandler, 0, CHEST_SLOT_X, CHEST_SLOT_Y));
+        addSlot(new ChestUpgradeSlot(chestHandler, 0, rowX[ROW_STORAGE], CHEST_SLOT_Y));
 
         // stock visible
         for (int row = 0; row < VISIBLE_ROWS; row++) {
@@ -128,14 +152,15 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
 
         // améliorations (3 slots)
         for (int i = 0; i < UPGRADE_COUNT; i++) {
-            addSlot(new UpgradeSlot(upgradeHandler, i, UPGRADE_XS[i], UPGRADE_YS[i]));
+            int x = (i == ShopBlockEntity.ADMIN_SLOT) ? rowX[ROW_ADMIN] : rowX[1 + i];
+            addSlot(new UpgradeSlot(upgradeHandler, i, x, UPGRADE_YS[i]));
         }
         // slot de sauvegarde (livre & plume), onglet Upgrade
         addSlot(new UpgradeSlot(saveHandler, 0, SAVE_QUILL_X, SAVE_Y));
         addSlot(new UpgradeSlot(saveHandler, 1, SAVE_SIGNED_X, SAVE_Y));
 
         // blocs d'émeraude : débloquent les offres (1 de base + 1 par bloc)
-        addSlot(new TradeUpgradeSlot(tradeHandler, 0, TRADE_SLOT_X, TRADE_SLOT_Y));
+        addSlot(new TradeUpgradeSlot(tradeHandler, 0, rowX[ROW_TRADE], TRADE_SLOT_Y));
 
         // Sync des drapeaux illimités (un DataSlot par offre)
         for (int i = 0; i < OFFERS; i++) {
@@ -149,6 +174,13 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
                 @Override public void set(int v) { infiniteFlags[idx] = v; }
             });
         }
+
+        // Capacité affichée synchronisée serveur -> client : le client ne connaît que le contenu des
+        // lignes visibles, il ne peut donc pas voir seul les items conservés hors capacité.
+        addDataSlot(new net.minecraft.world.inventory.DataSlot() {
+            @Override public int get() { return getDisplayCapacity(); }
+            @Override public void set(int v) { syncedDisplayCap = v; }
+        });
 
         // inventaire
         for (int row = 0; row < 3; row++) {
@@ -175,22 +207,29 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
     // ----- Stock / capacité -----------------------------------------------
 
     public int getChestCount() {
-        return Math.min(ShopBlockEntity.MAX_CHESTS, chestHandler.getStackInSlot(0).getCount());
+        return Math.min(VSConfig.maxChests(), chestHandler.getStackInSlot(0).getCount());
     }
 
     /** Nombre d'offres actives (1 + blocs d'émeraude), calculable côté client via le slot. */
     public int getTradeCount() {
-        return Math.min(ShopBlockEntity.MAX_OFFERS,
-                1 + Math.min(ShopBlockEntity.MAX_OFFERS - 1, tradeHandler.getStackInSlot(0).getCount()));
+        return Math.min(VSConfig.maxOffers(), 1 + tradeHandler.getStackInSlot(0).getCount());
     }
 
     @Override
     public int getActiveCapacity() {
-        int chests = getChestCount();
-        return chests == 0 ? ShopBlockEntity.BASE_CAPACITY : ShopBlockEntity.SLOTS_PER_CHEST * chests;
+        return VSConfig.capacityFor(getChestCount(), ShopBlockEntity.BASE_CAPACITY);
     }
 
-    public int getRows() { return (int) Math.ceil(getActiveCapacity() / 9.0); }
+    /** Côté client : capacité affichée reçue du serveur (voir le DataSlot du constructeur). */
+    private int syncedDisplayCap = 0;
+
+    @Override
+    public int getDisplayCapacity() {
+        if (be == null) return Math.max(getActiveCapacity(), syncedDisplayCap);
+        return ScrollableStorageMenu.displayCapacity(getActiveCapacity(), getChestCount(), storageHandler);
+    }
+
+    public int getRows() { return (int) Math.ceil(getDisplayCapacity() / 9.0); }
 
     public int getMaxScroll() { return Math.max(0, getRows() - VISIBLE_ROWS); }
 
@@ -201,13 +240,31 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
         this.scrollOffset = Math.max(0, Math.min(offset, getMaxScroll()));
     }
 
+    /** Version du stock déjà envoyée au client. */
+    private int sentStorageVersion = Integer.MIN_VALUE;
+
+    @Override
+    public void broadcastChanges() {
+        // Le stock se tasse et défile : un slot dont l'item « ne change pas » (bûches -> bûches) peut
+        // pourtant représenter un autre emplacement côté client. Dès que le stock bouge, on renvoie tout.
+        if (be != null && be.getStorageVersion() != sentStorageVersion) {
+            sentStorageVersion = be.getStorageVersion();
+            sendAllDataToRemote();
+            return;
+        }
+        super.broadcastChanges();
+    }
+
     @Override
     public boolean clickMenuButton(Player player, int id) {
         if (id >= TOGGLE_BUTTON_BASE) {
             if (be != null) be.toggleInfinite(id - TOGGLE_BUTTON_BASE);
             return true;
         }
-        setScrollOffset(id); // défilement du stock
+        setScrollOffset(id);
+        // Renvoi complet : un slot dont l'item ne change pas (ex. bûches 64 -> bûches 64) n'est pas
+        // resynchronisé, et le client n'aurait pas le contenu de la nouvelle ligne.
+        if (be != null) sendAllDataToRemote(); // défilement du stock
         return true;
     }
 
@@ -227,6 +284,10 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
 
     @Override
     public void clicked(int slotId, int dragType, ClickType clickType, Player player) {
+        if (DynamicStorageSlot.handleLockedClick(this, slotId, clickType, player)) {
+            if (be != null) be.compactStorage();
+            return;
+        }
         if (isGhost(slotId)) {
             Slot slot = slots.get(slotId);
             ItemStack carried = getCarried();
@@ -239,6 +300,7 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
             return;
         }
         super.clicked(slotId, dragType, clickType, player);
+        if (be != null) be.compactStorage();
     }
 
 
@@ -278,10 +340,10 @@ public class ShopConfigMenu extends AbstractContainerMenu implements ScrollableS
             if (!moveItemStackTo(stack, INV_START, INV_END, true)) return ItemStack.EMPTY;
         } else {
             boolean moved = false;
-            if (stack.is(Items.CHEST)) moved = moveItemStackTo(stack, CHEST_SLOT_INDEX, CHEST_SLOT_INDEX + 1, false);
+            if (stack.is(VSConfig.item(VSConfig.Upgrade.STORAGE))) moved = moveItemStackTo(stack, CHEST_SLOT_INDEX, CHEST_SLOT_INDEX + 1, false);
             if (!stack.isEmpty() && stack.is(Items.WRITABLE_BOOK)) moved = moveItemStackTo(stack, SAVE_QUILL_INDEX, SAVE_QUILL_INDEX + 1, false) || moved;
             if (!stack.isEmpty() && stack.is(Items.WRITTEN_BOOK)) moved = moveItemStackTo(stack, SAVE_SIGNED_INDEX, SAVE_SIGNED_INDEX + 1, false) || moved;
-            if (!stack.isEmpty() && stack.is(Items.EMERALD_BLOCK)) moved = moveItemStackTo(stack, TRADE_SLOT_INDEX, TRADE_SLOT_INDEX + 1, false) || moved;
+            if (!stack.isEmpty() && stack.is(VSConfig.item(VSConfig.Upgrade.TRADES))) moved = moveItemStackTo(stack, TRADE_SLOT_INDEX, TRADE_SLOT_INDEX + 1, false) || moved;
             if (!stack.isEmpty()) moved = moveItemStackTo(stack, UPGRADE_START, UPGRADE_START + UPGRADE_COUNT, false) || moved;
             if (!stack.isEmpty()) moved = moveItemStackTo(stack, STORAGE_START, STORAGE_END, false) || moved;
             if (!moved) return ItemStack.EMPTY;

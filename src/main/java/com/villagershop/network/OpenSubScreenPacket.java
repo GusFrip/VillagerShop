@@ -32,6 +32,7 @@ public record OpenSubScreenPacket(BlockPos pos, boolean stock) implements Custom
         if (!(player.level().getBlockEntity(msg.pos) instanceof ShopBlockEntity be) || !be.canAccess(player)) return;
 
         if (msg.stock) {
+            be.sanitizeUpgrades();
             player.openMenu(new ShopStockMenuFactory(be));
         } else {
             // be est lui-même l'ExtendedScreenHandlerFactory de l'écran de config

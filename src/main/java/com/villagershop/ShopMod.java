@@ -9,7 +9,9 @@ import com.villagershop.registry.ModCreativeTabs;
 import com.villagershop.registry.ModItems;
 import com.villagershop.registry.ModMenus;
 import com.villagershop.registry.ModVillagers;
+import com.villagershop.config.ShopConfigSpec;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import org.slf4j.Logger;
 
 /**
@@ -24,6 +26,10 @@ public class ShopMod implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        // Config : config/villagershop-common.json, relue au démarrage de chaque serveur (solo compris).
+        ShopConfigSpec.applyToRuntime();
+        ServerLifecycleEvents.SERVER_STARTING.register(server -> ShopConfigSpec.applyToRuntime());
+
         ModBlocks.register();
         ModItems.register();
         ModBlockEntities.register();
@@ -32,5 +38,6 @@ public class ShopMod implements ModInitializer {
         ModCreativeTabs.register();
         ModNetwork.register();
         VillagerInteractHandler.register();
+        com.villagershop.event.ConfigSyncHandler.register();
     }
 }

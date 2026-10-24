@@ -8,6 +8,9 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.LivingEntityFeatureRendererRegistrationCallback;
 import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraft.client.gui.screens.inventory.MerchantScreen;
+import com.villagershop.config.ShopConfigSpec;
+import com.villagershop.network.SyncConfigPacket;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.world.entity.EntityType;
@@ -34,5 +37,9 @@ public class ClientSetup implements ClientModInitializer {
                 helper.register(new ShopBadgeCoverLayer((RenderLayerParent) living));
             }
         });
+        // Config du serveur, reçue à la connexion.
+        ClientPlayNetworking.registerGlobalReceiver(SyncConfigPacket.TYPE, (msg, ctx) -> SyncConfigPacket.handleClient(msg));
+        // À la déconnexion d'un serveur, on reprend la config locale (celle du serveur était synchronisée).
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> ShopConfigSpec.applyToRuntime());
     }
 }
