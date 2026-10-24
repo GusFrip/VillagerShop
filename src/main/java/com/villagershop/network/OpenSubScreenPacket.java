@@ -38,6 +38,7 @@ public class OpenSubScreenPacket {
             if (!(player.level().getBlockEntity(msg.pos) instanceof ShopBlockEntity be) || !be.canAccess(player)) return;
 
             if (msg.stock) {
+                be.sanitizeUpgrades();
                 NetworkHooks.openScreen(player,
                         new SimpleMenuProvider((id, inv, p) -> new ShopStockMenu(id, inv, be),
                                 Component.translatable("container.villagershop.stock")),

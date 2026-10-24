@@ -8,7 +8,11 @@ import com.villagershop.registry.ModCreativeTabs;
 import com.villagershop.registry.ModItems;
 import com.villagershop.registry.ModMenus;
 import com.villagershop.registry.ModVillagers;
+import com.villagershop.config.ShopConfigSpec;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.fml.ModLoadingContext;
+import net.minecraftforge.fml.config.ModConfig;
+import net.minecraftforge.fml.event.config.ModConfigEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -42,8 +46,22 @@ public class ShopMod {
 
         modBus.addListener(this::commonSetup);
 
+        // Config : config/villagershop-common.toml, recopiée dans VSConfig à chaque (re)chargement.
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ShopConfigSpec.SPEC, "villagershop-common.toml");
+        modBus.addListener(this::onConfigLoad);
+        modBus.addListener(this::onConfigReload);
+
         // Les handlers d'événements de jeu (interaction villageois) vont sur le bus Forge.
         MinecraftForge.EVENT_BUS.register(new com.villagershop.event.VillagerInteractHandler());
+        MinecraftForge.EVENT_BUS.register(new com.villagershop.event.ConfigSyncHandler());
+    }
+
+    private void onConfigLoad(final ModConfigEvent.Loading event) {
+        if (event.getConfig().getSpec() == ShopConfigSpec.SPEC) ShopConfigSpec.applyToRuntime();
+    }
+
+    private void onConfigReload(final ModConfigEvent.Reloading event) {
+        if (event.getConfig().getSpec() == ShopConfigSpec.SPEC) ShopConfigSpec.applyToRuntime();
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {

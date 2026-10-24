@@ -1,5 +1,7 @@
 package com.villagershop.client;
 
+import net.minecraft.world.item.ItemStack;
+import com.villagershop.menu.DynamicStorageSlot;
 import com.villagershop.ShopMod;
 import com.villagershop.menu.ShopStockMenu;
 import com.villagershop.network.ModNetwork;
@@ -83,19 +85,41 @@ public class ShopStockScreen extends AbstractContainerScreen<ShopStockMenu> {
     /** Voile sur les emplacements de stock verrouillés (coffres manquants). */
     private void renderLockedStock(GuiGraphics gg, int mouseX, int mouseY) {
         Component tip = null;
-        int cap = menu.getActiveCapacity();
+        int cap = menu.getActiveCapacity(), shown = menu.getDisplayCapacity();
         for (int row = 0; row < ShopStockMenu.VISIBLE_ROWS; row++) {
             for (int col = 0; col < 9; col++) {
                 int idx = (menu.getScrollOffset() + row) * 9 + col;
                 if (idx < cap) continue;
+                boolean kept = idx < shown && menu.slots.get(ShopStockMenu.STORAGE_START + row * 9 + col).hasItem();
+                // case vide « coffre requis » : seulement jusqu'au 27e slot
+                if (!kept && idx >= com.villagershop.menu.ScrollableStorageMenu.PLACEHOLDER_END) continue;
                 int x = leftPos + ShopStockMenu.STORAGE_X + col * 18;
                 int y = topPos + ShopStockMenu.STORAGE_Y + row * 18;
                 gg.fill(x - 1, y - 1, x + 17, y + 17, 0x55313131);
                 if (mouseX >= x - 1 && mouseX < x + 17 && mouseY >= y - 1 && mouseY < y + 17)
-                    tip = Component.translatable("gui.villagershop.locked_stock");
+                    tip = Component.translatable(kept ? "gui.villagershop.locked_stock_keep" : "gui.villagershop.locked_stock");
             }
         }
-        if (tip != null) gg.renderTooltip(font, tip, mouseX, mouseY);
+        if (tip == null) return;
+        // Slot verrouillé occupé : une seule infobulle = celle de l'item + la consigne.
+        if (hoveredSlot instanceof DynamicStorageSlot ds && ds.isLocked() && hoveredSlot.hasItem()) {
+            ItemStack st = hoveredSlot.getItem();
+            java.util.List<Component> lines = new java.util.ArrayList<>(getTooltipFromContainerItem(st));
+            lines.add(tip.copy().withStyle(net.minecraft.ChatFormatting.GRAY));
+            gg.renderTooltip(font, lines, st.getTooltipImage(), mouseX, mouseY);
+            lockedTooltipShown = true;
+        } else {
+            gg.renderTooltip(font, tip, mouseX, mouseY);
+        }
+    }
+
+    /** Vrai si l'infobulle combinée d'un slot verrouillé vient d'être dessinée (on saute alors celle de vanilla). */
+    private boolean lockedTooltipShown = false;
+
+    @Override
+    protected void renderTooltip(GuiGraphics gg, int mouseX, int mouseY) {
+        if (lockedTooltipShown) { lockedTooltipShown = false; return; }
+        super.renderTooltip(gg, mouseX, mouseY);
     }
 
     private void renderScrollbar(GuiGraphics gg) {

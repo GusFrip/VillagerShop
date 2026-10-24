@@ -2,7 +2,7 @@ package com.villagershop.menu;
 
 import com.villagershop.block.ShopBlockEntity;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
+import com.villagershop.config.VSConfig;
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.SlotItemHandler;
 
@@ -20,11 +20,13 @@ public class ChestUpgradeSlot extends SlotItemHandler {
     public boolean isActive() { return visible; }
 
     @Override
-    public boolean mayPlace(ItemStack stack) { return stack.is(Items.CHEST); }
+    public boolean mayPlace(ItemStack stack) {
+        return VSConfig.isEnabled(VSConfig.Upgrade.STORAGE) && stack.is(VSConfig.item(VSConfig.Upgrade.STORAGE));
+    }
 
     @Override
-    public int getMaxStackSize() { return ShopBlockEntity.MAX_CHESTS; }
+    public int getMaxStackSize() { return Math.max(1, VSConfig.maxChests()); }
 
     @Override
-    public int getMaxStackSize(ItemStack stack) { return ShopBlockEntity.MAX_CHESTS; }
+    public int getMaxStackSize(ItemStack stack) { return getMaxStackSize(); }
 }

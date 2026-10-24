@@ -5,6 +5,7 @@ import com.villagershop.data.ShopOffer;
 import com.villagershop.menu.ChestUpgradeSlot;
 import com.villagershop.menu.DynamicStorageSlot;
 import com.villagershop.block.ShopBlockEntity;
+import com.villagershop.config.VSConfig;
 import com.villagershop.menu.ShopConfigMenu;
 import com.villagershop.menu.ToggleGhostSlot;
 import com.villagershop.menu.TradeUpgradeSlot;
@@ -114,6 +115,7 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
     }
 
     private boolean upgradePresent(int i) {
+        if (!VSConfig.isSlotEnabled(i)) return false;
         int idx = ShopConfigMenu.UPGRADE_START + i;
         return idx < menu.slots.size() && menu.slots.get(idx).hasItem();
     }
@@ -153,16 +155,18 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         boolean trade = currentTab == TAB_TRADE, stock = currentTab == TAB_STOCK;
         for (int i = 0; i < ShopConfigMenu.GHOST_SLOTS; i++)
             ((ToggleGhostSlot) menu.slots.get(i)).setVisible(trade && (i / ShopConfigMenu.GHOST_PER_OFFER) < menu.getTradeCount());
-        ((ChestUpgradeSlot) menu.slots.get(ShopConfigMenu.CHEST_SLOT_INDEX)).setVisible(currentTab == TAB_UPGRADE);
-        ((TradeUpgradeSlot) menu.slots.get(ShopConfigMenu.TRADE_SLOT_INDEX)).setVisible(currentTab == TAB_UPGRADE);
+        ((ChestUpgradeSlot) menu.slots.get(ShopConfigMenu.CHEST_SLOT_INDEX)).setVisible(currentTab == TAB_UPGRADE && VSConfig.isEnabled(VSConfig.Upgrade.STORAGE));
+        ((TradeUpgradeSlot) menu.slots.get(ShopConfigMenu.TRADE_SLOT_INDEX)).setVisible(currentTab == TAB_UPGRADE && VSConfig.maxTradeBlocks() > 0);
         for (int i = ShopConfigMenu.STORAGE_START; i < ShopConfigMenu.STORAGE_END; i++)
             ((DynamicStorageSlot) menu.slots.get(i)).setTabVisible(stock);
         boolean up = currentTab == TAB_UPGRADE;
+        // Une amélioration désactivée dans la config n'a plus de slot visible.
         for (int i = ShopConfigMenu.UPGRADE_START; i < ShopConfigMenu.ADMIN_SLOT_INDEX; i++)
-            ((UpgradeSlot) menu.slots.get(i)).setVisible(up);
-        // Slot admin caché : n'apparaît que s'il est déjà occupé ou qu'un bloc de commande est au curseur.
-        boolean adminVisible = up && (menu.slots.get(ShopConfigMenu.ADMIN_SLOT_INDEX).hasItem()
-                || menu.getCarried().is(Items.COMMAND_BLOCK));
+            ((UpgradeSlot) menu.slots.get(i)).setVisible(up && VSConfig.isSlotEnabled(i - ShopConfigMenu.UPGRADE_START));
+        // Slot admin caché : n'apparaît que s'il est déjà occupé ou que l'item admin est au curseur.
+        boolean adminVisible = up && VSConfig.isEnabled(VSConfig.Upgrade.ADMIN)
+                && (menu.slots.get(ShopConfigMenu.ADMIN_SLOT_INDEX).hasItem()
+                || menu.getCarried().is(VSConfig.item(VSConfig.Upgrade.ADMIN)));
         ((UpgradeSlot) menu.slots.get(ShopConfigMenu.ADMIN_SLOT_INDEX)).setVisible(adminVisible);
 
         // Modules conditionnels (visibles seulement si l'upgrade correspondant est posé)
@@ -213,7 +217,7 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
                 gg.drawString(font, "→", base + ShopConfigMenu.OFF_ARROW_DX, y, 0x555555, false);
             }
             Component cnt = Component.translatable("gui.villagershop.offers_count",
-                    menu.getTradeCount(), ShopConfigMenu.OFFERS);
+                    menu.getTradeCount(), VSConfig.maxOffers());
             gg.drawString(font, cnt, imageWidth - font.width(cnt) - 8, 24, 0x404040, false);
             // séparateur vertical central
             gg.fill(87, 32, 88, 112, 0xFF555555);
@@ -264,9 +268,9 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
 
     /** Bloc d'émeraude grisé dans le slot de déblocage des offres. */
     private void renderGhostTrade(GuiGraphics gg) {
-        if (menu.slots.get(ShopConfigMenu.TRADE_SLOT_INDEX).hasItem()) return;
-        ghostIcon(gg, new ItemStack(Items.EMERALD_BLOCK),
-                leftPos + ShopConfigMenu.TRADE_SLOT_X, topPos + ShopConfigMenu.TRADE_SLOT_Y);
+        if (menu.slots.get(ShopConfigMenu.TRADE_SLOT_INDEX).hasItem() || VSConfig.maxTradeBlocks() == 0) return;
+        var slot = menu.slots.get(ShopConfigMenu.TRADE_SLOT_INDEX);
+        ghostIcon(gg, new ItemStack(VSConfig.item(VSConfig.Upgrade.TRADES)), leftPos + slot.x, topPos + slot.y);
     }
 
     /** Position écran du bouton ∞ de l'offre i. */
@@ -295,7 +299,7 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
     /** Voile sur les offres verrouillées + tooltip explicatif. */
     private void renderLockedOffers(GuiGraphics gg, int mouseX, int mouseY) {
         Component tip = null;
-        for (int i = menu.getTradeCount(); i < ShopConfigMenu.OFFERS; i++) {
+        for (int i = menu.getTradeCount(); i < VSConfig.maxOffers(); i++) {
             int base = leftPos + ((i / ShopConfigMenu.OFFER_ROWS == 0) ? ShopConfigMenu.COL0_X : ShopConfigMenu.COL1_X);
             int y = topPos + ShopConfigMenu.OFFER_Y0 + (i % ShopConfigMenu.OFFER_ROWS) * ShopConfigMenu.OFFER_DY;
             int x0 = base + ShopConfigMenu.OFF_PRICE_A_DX - 1, x1 = base + ShopConfigMenu.OFF_RESULT_DX + 17;
@@ -309,20 +313,43 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
     /** Voile sur les emplacements de stock verrouillés (coffres manquants). */
     private void renderLockedStock(GuiGraphics gg, int mouseX, int mouseY) {
         Component tip = null;
-        int cap = menu.getActiveCapacity();
+        int cap = menu.getActiveCapacity(), shown = menu.getDisplayCapacity();
         for (int row = 0; row < ShopConfigMenu.VISIBLE_ROWS; row++) {
             for (int col = 0; col < 9; col++) {
                 int idx = (menu.getScrollOffset() + row) * 9 + col;
                 if (idx < cap) continue;
+                // kept = item conservé hors capacité (fond déjà dessiné par renderBg : simple voile) ;
+                // sinon case vide « coffre requis », seulement jusqu'au 27e slot.
+                boolean kept = idx < shown && menu.slots.get(ShopConfigMenu.STORAGE_START + row * 9 + col).hasItem();
+                if (!kept && idx >= com.villagershop.menu.ScrollableStorageMenu.PLACEHOLDER_END) continue;
                 int x = leftPos + ShopConfigMenu.STORAGE_X + col * 18;
                 int y = topPos + ShopConfigMenu.STORAGE_Y + row * 18;
-                slotBg(gg, x, y);
+                if (!kept) slotBg(gg, x, y);
                 gg.fill(x - 1, y - 1, x + 17, y + 17, 0x55313131);
                 if (mouseX >= x - 1 && mouseX < x + 17 && mouseY >= y - 1 && mouseY < y + 17)
-                    tip = Component.translatable("gui.villagershop.locked_stock");
+                    tip = Component.translatable(kept ? "gui.villagershop.locked_stock_keep" : "gui.villagershop.locked_stock");
             }
         }
-        if (tip != null) gg.renderTooltip(font, tip, mouseX, mouseY);
+        if (tip == null) return;
+        // Slot verrouillé occupé : une seule infobulle = celle de l'item + la consigne.
+        if (hoveredSlot instanceof DynamicStorageSlot ds && ds.isLocked() && hoveredSlot.hasItem()) {
+            ItemStack st = hoveredSlot.getItem();
+            java.util.List<Component> lines = new java.util.ArrayList<>(getTooltipFromContainerItem(st));
+            lines.add(tip.copy().withStyle(net.minecraft.ChatFormatting.GRAY));
+            gg.renderTooltip(font, lines, st.getTooltipImage(), mouseX, mouseY);
+            lockedTooltipShown = true;
+        } else {
+            gg.renderTooltip(font, tip, mouseX, mouseY);
+        }
+    }
+
+    /** Vrai si l'infobulle combinée d'un slot verrouillé vient d'être dessinée (on saute alors celle de vanilla). */
+    private boolean lockedTooltipShown = false;
+
+    @Override
+    protected void renderTooltip(GuiGraphics gg, int mouseX, int mouseY) {
+        if (lockedTooltipShown) { lockedTooltipShown = false; return; }
+        super.renderTooltip(gg, mouseX, mouseY);
     }
 
     private void renderCoownerList(GuiGraphics gg, int mouseX, int mouseY) {
@@ -348,17 +375,14 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
         drawScroller(gg, leftPos + CO_SB_X, topPos + CO_Y, CO_VISIBLE * CO_ROW_H, coownerScroll, max);
     }
 
-    /** Coffre grisé indiquant ce qu'on peut déposer (façon lapis de la table d'enchantement). */
-    private static final ItemStack[] UPGRADE_HINTS = {
-            new ItemStack(Items.NETHER_STAR), new ItemStack(Items.PRISMARINE_SHARD), new ItemStack(Items.LIGHTNING_ROD),
-            new ItemStack(Items.BOOKSHELF), new ItemStack(Items.GOLD_BLOCK), new ItemStack(Items.OBSIDIAN)};
-
+    /** Item grisé indiquant ce qu'on peut déposer (façon lapis de la table d'enchantement), selon la config. */
     private void renderGhostUpgrades(GuiGraphics gg) {
-        for (int i = 0; i < UPGRADE_HINTS.length; i++) {
-            if (menu.slots.get(ShopConfigMenu.UPGRADE_START + i).hasItem()) continue;
-            int x = leftPos + ShopConfigMenu.UPGRADE_XS[i];
-            int y = topPos + ShopConfigMenu.UPGRADE_YS[i];
-            gg.renderItem(UPGRADE_HINTS[i], x, y);
+        for (int i = 0; i < ShopBlockEntity.ADMIN_SLOT; i++) {
+            if (!VSConfig.isSlotEnabled(i) || menu.slots.get(ShopConfigMenu.UPGRADE_START + i).hasItem()) continue;
+            var slot = menu.slots.get(ShopConfigMenu.UPGRADE_START + i);
+            int x = leftPos + slot.x;
+            int y = topPos + slot.y;
+            gg.renderItem(new ItemStack(VSConfig.item(VSConfig.Upgrade.bySlot(i))), x, y);
             gg.pose().pushPose();
             gg.pose().translate(0, 0, 200);
             gg.fill(x, y, x + 16, y + 16, 0xAAC6C6C6);
@@ -370,13 +394,14 @@ public class ShopConfigScreen extends AbstractContainerScreen<ShopConfigMenu> {
     private void renderGhostAdmin(GuiGraphics gg) {
         var slot = menu.slots.get(ShopConfigMenu.ADMIN_SLOT_INDEX);
         if (!slot.isActive() || slot.hasItem()) return;
-        ghostIcon(gg, new ItemStack(Items.COMMAND_BLOCK), leftPos + slot.x, topPos + slot.y);
+        ghostIcon(gg, new ItemStack(VSConfig.item(VSConfig.Upgrade.ADMIN)), leftPos + slot.x, topPos + slot.y);
     }
 
     private void renderGhostChest(GuiGraphics gg) {
-        if (menu.slots.get(ShopConfigMenu.CHEST_SLOT_INDEX).hasItem()) return;
-        int x = leftPos + ShopConfigMenu.CHEST_SLOT_X, y = topPos + ShopConfigMenu.CHEST_SLOT_Y;
-        gg.renderItem(new ItemStack(Items.CHEST), x, y);
+        if (menu.slots.get(ShopConfigMenu.CHEST_SLOT_INDEX).hasItem() || !VSConfig.isEnabled(VSConfig.Upgrade.STORAGE)) return;
+        var slot = menu.slots.get(ShopConfigMenu.CHEST_SLOT_INDEX);
+        int x = leftPos + slot.x, y = topPos + slot.y;
+        gg.renderItem(new ItemStack(VSConfig.item(VSConfig.Upgrade.STORAGE)), x, y);
         gg.pose().pushPose();
         gg.pose().translate(0, 0, 200);
         gg.fill(x, y, x + 16, y + 16, 0xAAC6C6C6); // voile pour griser

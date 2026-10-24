@@ -4,7 +4,10 @@ import com.villagershop.ShopMod;
 import com.villagershop.registry.ModMenus;
 import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraft.client.gui.screens.inventory.MerchantScreen;
+import com.villagershop.config.ShopConfigSpec;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
+import net.minecraftforge.common.MinecraftForge;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraftforge.client.event.EntityRenderersEvent;
@@ -32,5 +35,7 @@ public class ClientSetup {
             MenuScreens.register(ModMenus.SHOP_STOCK.get(), ShopStockScreen::new);
             MenuScreens.register(ModMenus.SHOP_MERCHANT.get(), MerchantScreen::new);
         });
+        // À la déconnexion d'un serveur, on reprend la config locale (celle du serveur était synchronisée).
+        MinecraftForge.EVENT_BUS.addListener((ClientPlayerNetworkEvent.LoggingOut e) -> ShopConfigSpec.applyToRuntime());
     }
 }
