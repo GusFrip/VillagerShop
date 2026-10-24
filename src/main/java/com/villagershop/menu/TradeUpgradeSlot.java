@@ -2,7 +2,7 @@ package com.villagershop.menu;
 
 import com.villagershop.block.ShopBlockEntity;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
+import com.villagershop.config.VSConfig;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.SlotItemHandler;
 
@@ -20,11 +20,13 @@ public class TradeUpgradeSlot extends SlotItemHandler {
     public boolean isActive() { return visible; }
 
     @Override
-    public boolean mayPlace(ItemStack stack) { return stack.is(Items.EMERALD_BLOCK); }
+    public boolean mayPlace(ItemStack stack) {
+        return VSConfig.maxTradeBlocks() > 0 && stack.is(VSConfig.item(VSConfig.Upgrade.TRADES));
+    }
 
     @Override
-    public int getMaxStackSize() { return ShopBlockEntity.MAX_OFFERS - 1; }
+    public int getMaxStackSize() { return Math.max(1, VSConfig.maxTradeBlocks()); }
 
     @Override
-    public int getMaxStackSize(ItemStack stack) { return ShopBlockEntity.MAX_OFFERS - 1; }
+    public int getMaxStackSize(ItemStack stack) { return getMaxStackSize(); }
 }

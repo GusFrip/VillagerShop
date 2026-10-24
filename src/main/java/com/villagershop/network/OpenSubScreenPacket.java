@@ -35,6 +35,7 @@ public record OpenSubScreenPacket(BlockPos pos, boolean stock) implements Custom
         if (!(player.level().getBlockEntity(msg.pos) instanceof ShopBlockEntity be) || !be.canAccess(player)) return;
 
         if (msg.stock) {
+            be.sanitizeUpgrades();
             player.openMenu(
                     new SimpleMenuProvider((id, inv, p) -> new ShopStockMenu(id, inv, be),
                             Component.translatable("container.villagershop.stock")),

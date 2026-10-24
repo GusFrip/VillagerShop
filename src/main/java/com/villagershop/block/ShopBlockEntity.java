@@ -1,5 +1,6 @@
 package com.villagershop.block;
 
+import com.villagershop.config.VSConfig;
 import com.villagershop.data.ShopOffer;
 import com.villagershop.menu.ShopConfigMenu;
 import com.villagershop.registry.ModVillagers;
@@ -46,16 +47,32 @@ import java.util.UUID;
  * nombre de coffres : 0 coffre = 3 emplacements, sinon 27 × (nb coffres).
  */
 public class ShopBlockEntity extends BlockEntity implements MenuProvider {
-    public static final int MAX_OFFERS = 8;
+    /** Plafonds absolus (taille des tableaux / handlers). Les valeurs effectives viennent de VSConfig. */
+    public static final int MAX_OFFERS = VSConfig.ABS_MAX_OFFERS;
     public static final int BASE_CAPACITY = 3;
-    public static final int SLOTS_PER_CHEST = 27;
-    public static final int MAX_CHESTS = 8;
-    public static final int MAX_STORAGE = SLOTS_PER_CHEST * MAX_CHESTS; // 216
+    public static final int MAX_STORAGE = VSConfig.ABS_MAX_STORAGE; // 432
+
+    /** Incrémenté à chaque modification du stock : les menus ouverts renvoient alors tout l'affichage. */
+    private int storageVersion = 0;
+    public int getStorageVersion() { return storageVersion; }
 
     private final ItemStackHandler storage = new ItemStackHandler(MAX_STORAGE) {
         @Override
         protected void onContentsChanged(int slot) {
+            storageVersion++;
             setChanged();
+        }
+
+        @Override
+        public void deserializeNBT(HolderLookup.Provider provider, CompoundTag nbt) {
+            // Taille fixe : on ignore le "Size" des anciennes sauvegardes (216) pour ne pas rétrécir le handler.
+            setSize(MAX_STORAGE);
+            ListTag items = nbt.getList("Items", Tag.TAG_COMPOUND);
+            for (int i = 0; i < items.size(); i++) {
+                CompoundTag it = items.getCompound(i);
+                int slot = it.getInt("Slot");
+                if (slot >= 0 && slot < MAX_STORAGE) setStackInSlot(slot, ItemStack.parseOptional(provider, it));
+            }
         }
     };
 
@@ -63,12 +80,12 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
     private final ItemStackHandler chestUpgrade = new ItemStackHandler(1) {
         @Override
         public int getSlotLimit(int slot) {
-            return MAX_CHESTS;
+            return Math.max(1, VSConfig.maxChests());
         }
 
         @Override
         public boolean isItemValid(int slot, @NotNull ItemStack stack) {
-            return stack.is(Items.CHEST);
+            return VSConfig.isEnabled(VSConfig.Upgrade.STORAGE) && stack.is(VSConfig.item(VSConfig.Upgrade.STORAGE));
         }
 
         @Override
@@ -81,12 +98,12 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
     private final ItemStackHandler tradeUpgrade = new ItemStackHandler(1) {
         @Override
         public int getSlotLimit(int slot) {
-            return MAX_OFFERS - 1;
+            return Math.max(1, VSConfig.maxTradeBlocks());
         }
 
         @Override
         public boolean isItemValid(int slot, @NotNull ItemStack stack) {
-            return stack.is(Items.EMERALD_BLOCK);
+            return VSConfig.maxTradeBlocks() > 0 && stack.is(VSConfig.item(VSConfig.Upgrade.TRADES));
         }
 
         @Override
@@ -116,19 +133,11 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
 
         @Override
         public boolean isItemValid(int slot, @NotNull ItemStack stack) {
-            return switch (slot) {
-                case 0 -> stack.is(Items.NETHER_STAR);
-                case 1 -> stack.is(Items.PRISMARINE_SHARD) || stack.is(Items.AMETHYST_SHARD);
-                case 2 -> stack.is(Items.LIGHTNING_ROD);
-                case 3 -> stack.is(Items.BOOKSHELF);
-                case 4 -> stack.is(Items.GOLD_BLOCK);
-                case 5 -> stack.is(Items.OBSIDIAN);
-                // Kit de garde : seulement si PillagerControl est installé.
-                case 6 -> net.minecraft.core.registries.BuiltInRegistries.ITEM
-                        .getKey(stack.getItem()).equals(GUARD_KIT_ID);
-                case ADMIN_SLOT -> stack.is(Items.COMMAND_BLOCK);
-                default -> false;
-            };
+            // Kit de garde : seulement si PillagerControl est installé (hors config).
+            if (slot == VSConfig.GUARD_KIT_SLOT)
+                return net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).equals(GUARD_KIT_ID);
+            // Autres slots : items et activation pilotés par la config (VSConfig.Upgrade).
+            return VSConfig.accepts(slot, stack);
         }
 
         @Override
@@ -189,36 +198,42 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
 
     public ItemStackHandler getTradeUpgrade() { return tradeUpgrade; }
 
-    /** Nombre d'offres actives : 1 de base + 1 par bloc d'émeraude (max 8). */
+    /** Nombre d'offres actives : 1 de base + 1 par bloc d'émeraude (max configurable, 8 au plus). */
     public int getActiveOfferCount() {
-        return Math.min(MAX_OFFERS, 1 + Math.min(MAX_OFFERS - 1, tradeUpgrade.getStackInSlot(0).getCount()));
+        return Math.min(VSConfig.maxOffers(), 1 + tradeUpgrade.getStackInSlot(0).getCount());
+    }
+
+    /** Amélioration présente ET activée dans la config. */
+    private boolean upgradeOn(int slot) {
+        return VSConfig.isSlotEnabled(slot) && !upgrades.getStackInSlot(slot).isEmpty();
     }
 
     public ItemStackHandler getUpgrades() { return upgrades; }
 
-    public boolean isImmortal() { return !upgrades.getStackInSlot(0).isEmpty(); }
+    public boolean isImmortal() { return upgradeOn(0); }
 
     public MovementMode getMovementMode() {
+        if (!VSConfig.isSlotEnabled(1)) return MovementMode.FREE;
         ItemStack s = upgrades.getStackInSlot(1);
-        if (s.is(Items.AMETHYST_SHARD)) return MovementMode.STATIC;
-        if (s.is(Items.PRISMARINE_SHARD)) return MovementMode.TETHER;
+        if (s.is(VSConfig.movementStaticItem())) return MovementMode.STATIC;
+        if (s.is(VSConfig.item(VSConfig.Upgrade.MOVEMENT))) return MovementMode.TETHER;
         return MovementMode.FREE;
     }
 
     /** Paratonnerre installé : le propriétaire reçoit les notifications. */
-    public boolean hasNotifier() { return !upgrades.getStackInSlot(2).isEmpty(); }
+    public boolean hasNotifier() { return upgradeOn(2); }
 
     /** Bibliothèque : module de sauvegarde (export/import livre) accessible. */
-    public boolean hasMemory() { return !upgrades.getStackInSlot(3).isEmpty(); }
+    public boolean hasMemory() { return upgradeOn(3); }
 
     /** Bloc d'or : gestion des co-propriétaires accessible. */
-    public boolean hasAccess() { return !upgrades.getStackInSlot(4).isEmpty(); }
+    public boolean hasAccess() { return upgradeOn(4); }
 
     /** Obsidienne : le comptoir résiste aux explosions. */
-    public boolean hasBlastProtection() { return !upgrades.getStackInSlot(5).isEmpty(); }
+    public boolean hasBlastProtection() { return upgradeOn(5); }
 
     /** Bloc de commande (slot caché) : mode admin, les offres peuvent servir en illimité. */
-    public boolean hasAdmin() { return !upgrades.getStackInSlot(ADMIN_SLOT).isEmpty(); }
+    public boolean hasAdmin() { return upgradeOn(ADMIN_SLOT); }
 
     /** Une offre est réellement illimitée si son drapeau est posé ET que l'upgrade Admin est présente. */
     public boolean isInfinite(ShopOffer offer) { return hasAdmin() && offer.isInfinite(); }
@@ -358,17 +373,18 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
     }
 
     public int getChestCount() {
-        return Math.min(MAX_CHESTS, chestUpgrade.getStackInSlot(0).getCount());
+        return Math.min(VSConfig.maxChests(), chestUpgrade.getStackInSlot(0).getCount());
     }
 
     public int getActiveCapacity() {
-        int chests = getChestCount();
-        return chests == 0 ? BASE_CAPACITY : SLOTS_PER_CHEST * chests;
+        return VSConfig.capacityFor(getChestCount(), BASE_CAPACITY);
     }
 
     private void onUpgradeChanged() {
         if (level != null && !level.isClientSide) {
-            ejectOverflow();
+            // Coffre retiré : comme pour une baisse de config, le stock au-delà de la capacité
+            // est conservé (slots verrouillés, récupérables au clic) au lieu d'être lâché au sol.
+            compactStorage();
             // L'upgrade Communication vient peut-être d'être posée : on enregistre
             // la boutique au Registre des ventes pour qu'elle apparaisse même à 0 vente.
             if (hasNotifier() && level instanceof net.minecraft.server.level.ServerLevel sl) {
@@ -378,19 +394,74 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
         setChanged();
     }
 
-    /** Éjecte (lâche au sol) tout item situé au-delà de la capacité active. */
-    private void ejectOverflow() {
-        if (level == null) return;
-        int cap = getActiveCapacity();
-        for (int i = cap; i < MAX_STORAGE; i++) {
-            ItemStack s = storage.getStackInSlot(i);
-            if (!s.isEmpty()) {
-                Containers.dropItemStack(level,
-                        getBlockPos().getX() + 0.5, getBlockPos().getY() + 1.0, getBlockPos().getZ() + 0.5,
-                        s.copy());
-                storage.setStackInSlot(i, ItemStack.EMPTY);
+    /** Vrai pendant {@link #sanitizeUpgrades()} : le stock hors capacité doit être conservé, pas éjecté. */
+    private boolean sanitizing = false;
+
+    /**
+     * Rend au stock les items d'upgrade que la config ne prend plus en charge : upgrade désactivée,
+     * item changé, coffres / blocs d'émeraude au-delà du maximum. Ils vont dans la capacité active,
+     * sinon dans les slots hors capacité (verrouillés, récupérables au clic), sinon au sol.
+     */
+    public void sanitizeUpgrades() {
+        if (level == null || level.isClientSide) return;
+        sanitizing = true;
+        try {
+            trimUpgrade(chestUpgrade, VSConfig.maxChests());
+            trimUpgrade(tradeUpgrade, VSConfig.maxTradeBlocks());
+            for (int i = 0; i < UPGRADE_SLOTS; i++) {
+                if (i == VSConfig.GUARD_KIT_SLOT) continue; // hors config
+                ItemStack s = upgrades.getStackInSlot(i);
+                if (!s.isEmpty() && !VSConfig.accepts(i, s)) {
+                    upgrades.setStackInSlot(i, ItemStack.EMPTY);
+                    returnToStock(s.copy());
+                }
             }
+        } finally {
+            sanitizing = false;
         }
+        compactStorage();
+    }
+
+    /** Tasse le stock : chaque slot vidé est comblé par les items suivants (ordre conservé).
+     *  Les items hors capacité remontent ainsi dans la capacité dès qu'il y a de la place. */
+    public void compactStorage() {
+        if (level == null || level.isClientSide) return;
+        int w = 0;
+        for (int r = 0; r < MAX_STORAGE; r++) {
+            ItemStack s = storage.getStackInSlot(r);
+            if (s.isEmpty()) continue;
+            if (r != w) {
+                storage.setStackInSlot(w, s);
+                storage.setStackInSlot(r, ItemStack.EMPTY);
+            }
+            w++;
+        }
+    }
+
+    /** Ramène le slot (1 emplacement) à {@code max} items valides ; le reste part au stock. */
+    private void trimUpgrade(ItemStackHandler h, int max) {
+        ItemStack s = h.getStackInSlot(0);
+        if (s.isEmpty()) return;
+        int keep = h.isItemValid(0, s) ? Math.min(s.getCount(), Math.max(0, max)) : 0;
+        if (keep >= s.getCount()) return;
+        ItemStack out = s.copy();
+        out.setCount(s.getCount() - keep);
+        ItemStack in = s.copy();
+        in.setCount(keep);
+        h.setStackInSlot(0, keep > 0 ? in : ItemStack.EMPTY);
+        returnToStock(out);
+    }
+
+    private void returnToStock(ItemStack stack) {
+        stack = insertStacked(stack);
+        for (int i = getActiveCapacity(); i < MAX_STORAGE && !stack.isEmpty(); i++) {
+            if (storage.getStackInSlot(i).isEmpty()) stack = storage.insertItem(i, stack, false);
+        }
+        if (!stack.isEmpty() && level != null) {
+            Containers.dropItemStack(level,
+                    getBlockPos().getX() + 0.5, getBlockPos().getY() + 1.0, getBlockPos().getZ() + 0.5, stack);
+        }
+        setChanged();
     }
 
     // ----- Propriété / permissions ----------------------------------------
@@ -571,6 +642,7 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
                 remaining -= take;
             }
         }
+        compactStorage();
     }
 
     /**
@@ -817,6 +889,7 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, ShopBlockEntity be) {
         if (level.getGameTime() % 20L != 0L) return;
+        be.sanitizeUpgrades();
         be.applyToVillager(level, pos, state);
         be.checkNotifications(level);
     }
@@ -996,6 +1069,7 @@ public class ShopBlockEntity extends BlockEntity implements MenuProvider {
     @Nullable
     @Override
     public AbstractContainerMenu createMenu(int id, Inventory inv, Player player) {
+        sanitizeUpgrades();
         return new ShopConfigMenu(id, inv, this);
     }
 }

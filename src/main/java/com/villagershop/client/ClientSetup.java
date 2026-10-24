@@ -3,6 +3,10 @@ package com.villagershop.client;
 import com.villagershop.ShopMod;
 import com.villagershop.registry.ModMenus;
 import net.minecraft.client.gui.screens.inventory.MerchantScreen;
+import com.villagershop.config.ShopConfigSpec;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.common.NeoForge;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.world.entity.EntityType;
 import net.neoforged.api.distmarker.Dist;
@@ -29,5 +33,11 @@ public class ClientSetup {
         event.register(ModMenus.SHOP_TRADE.get(), ShopTradeScreen::new);
         event.register(ModMenus.SHOP_STOCK.get(), ShopStockScreen::new);
         event.register(ModMenus.SHOP_MERCHANT.get(), MerchantScreen::new);
+    }
+
+    @SubscribeEvent
+    public static void onClientSetup(FMLClientSetupEvent event) {
+        // À la déconnexion d'un serveur, on reprend la config locale (celle du serveur était synchronisée).
+        NeoForge.EVENT_BUS.addListener((ClientPlayerNetworkEvent.LoggingOut e) -> ShopConfigSpec.applyToRuntime());
     }
 }

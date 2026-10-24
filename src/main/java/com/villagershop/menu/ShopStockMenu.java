@@ -1,6 +1,7 @@
 package com.villagershop.menu;
 
 import com.villagershop.block.ShopBlockEntity;
+import com.villagershop.config.VSConfig;
 import com.villagershop.registry.ModMenus;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
@@ -39,6 +40,7 @@ public class ShopStockMenu extends AbstractContainerMenu implements ScrollableSt
     @Nullable
     private final ShopBlockEntity be;
     private final IItemHandler chestHandler;
+    private final IItemHandler storageHandler;
     private final BlockPos pos;
     private int scrollOffset = 0;
 
@@ -57,23 +59,36 @@ public class ShopStockMenu extends AbstractContainerMenu implements ScrollableSt
                           IItemHandlerModifiable storage, IItemHandler chestHandler) {
         super(ModMenus.SHOP_STOCK.get(), id);
         this.be = be;
+
+        // Capacité affichée synchronisée serveur -> client : le client ne connaît que le contenu des
+        // lignes visibles, il ne peut donc pas voir seul les items conservés hors capacité.
+        addDataSlot(new net.minecraft.world.inventory.DataSlot() {
+            @Override public int get() { return getDisplayCapacity(); }
+            @Override public void set(int v) { syncedDisplayCap = v; }
+        });
         this.pos = pos;
         this.chestHandler = chestHandler;
+        this.storageHandler = storage;
 
         addSlot(new SlotItemHandler(chestHandler, 0, CHEST_SLOT_X, CHEST_SLOT_Y) {
             @Override
             public boolean mayPlace(ItemStack stack) {
-                return stack.is(Items.CHEST);
+                return VSConfig.isEnabled(VSConfig.Upgrade.STORAGE) && stack.is(VSConfig.item(VSConfig.Upgrade.STORAGE));
+            }
+
+            @Override
+            public boolean isActive() {
+                return VSConfig.isEnabled(VSConfig.Upgrade.STORAGE) || hasItem();
             }
 
             @Override
             public int getMaxStackSize() {
-                return ShopBlockEntity.MAX_CHESTS;
+                return Math.max(1, VSConfig.maxChests());
             }
 
             @Override
             public int getMaxStackSize(ItemStack stack) {
-                return ShopBlockEntity.MAX_CHESTS;
+                return getMaxStackSize();
             }
         });
 
@@ -97,17 +112,25 @@ public class ShopStockMenu extends AbstractContainerMenu implements ScrollableSt
     }
 
     public int getChestCount() {
-        return Math.min(ShopBlockEntity.MAX_CHESTS, chestHandler.getStackInSlot(0).getCount());
+        return Math.min(VSConfig.maxChests(), chestHandler.getStackInSlot(0).getCount());
     }
 
     @Override
     public int getActiveCapacity() {
-        int chests = getChestCount();
-        return chests == 0 ? ShopBlockEntity.BASE_CAPACITY : ShopBlockEntity.SLOTS_PER_CHEST * chests;
+        return VSConfig.capacityFor(getChestCount(), ShopBlockEntity.BASE_CAPACITY);
+    }
+
+    /** Côté client : capacité affichée reçue du serveur (voir le DataSlot du constructeur). */
+    private int syncedDisplayCap = 0;
+
+    @Override
+    public int getDisplayCapacity() {
+        if (be == null) return Math.max(getActiveCapacity(), syncedDisplayCap);
+        return ScrollableStorageMenu.displayCapacity(getActiveCapacity(), getChestCount(), storageHandler);
     }
 
     public int getRows() {
-        return (int) Math.ceil(getActiveCapacity() / 9.0);
+        return (int) Math.ceil(getDisplayCapacity() / 9.0);
     }
 
     public int getMaxScroll() {
@@ -123,10 +146,35 @@ public class ShopStockMenu extends AbstractContainerMenu implements ScrollableSt
         this.scrollOffset = Math.max(0, Math.min(offset, getMaxScroll()));
     }
 
+    /** Version du stock déjà envoyée au client. */
+    private int sentStorageVersion = Integer.MIN_VALUE;
+
+    @Override
+    public void broadcastChanges() {
+        // Le stock se tasse et défile : un slot dont l'item « ne change pas » (bûches -> bûches) peut
+        // pourtant représenter un autre emplacement côté client. Dès que le stock bouge, on renvoie tout.
+        if (be != null && be.getStorageVersion() != sentStorageVersion) {
+            sentStorageVersion = be.getStorageVersion();
+            sendAllDataToRemote();
+            return;
+        }
+        super.broadcastChanges();
+    }
+
     @Override
     public boolean clickMenuButton(Player player, int id) {
         setScrollOffset(id);
+        // Renvoi complet : un slot dont l'item ne change pas (ex. bûches 64 -> bûches 64) n'est pas
+        // resynchronisé, et le client n'aurait pas le contenu de la nouvelle ligne.
+        if (be != null) sendAllDataToRemote();
         return true;
+    }
+
+    @Override
+    public void clicked(int slotId, int dragType, net.minecraft.world.inventory.ClickType clickType, Player player) {
+        if (!DynamicStorageSlot.handleLockedClick(this, slotId, clickType, player))
+            super.clicked(slotId, dragType, clickType, player);
+        if (be != null) be.compactStorage();
     }
 
     @Override
@@ -140,7 +188,7 @@ public class ShopStockMenu extends AbstractContainerMenu implements ScrollableSt
             if (!moveItemStackTo(stack, INV_START, INV_END, true)) return ItemStack.EMPTY;
         } else {
             boolean moved = false;
-            if (stack.is(Items.CHEST)) {
+            if (stack.is(VSConfig.item(VSConfig.Upgrade.STORAGE))) {
                 moved = moveItemStackTo(stack, CHEST_SLOT_INDEX, CHEST_SLOT_INDEX + 1, false);
             }
             if (!stack.isEmpty()) {
