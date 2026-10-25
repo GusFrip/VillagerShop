@@ -40,6 +40,12 @@ public class ClientSetup implements ClientModInitializer {
         // Config du serveur, reçue à la connexion.
         ClientPlayNetworking.registerGlobalReceiver(SyncConfigPacket.TYPE, (msg, ctx) -> SyncConfigPacket.handleClient(msg));
         // À la déconnexion d'un serveur, on reprend la config locale (celle du serveur était synchronisée).
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> ShopConfigSpec.applyToRuntime());
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            ShopConfigSpec.applyToRuntime();
+            GuideSync.refresh();
+        });
+        // Guide Patchouli : fonctions de texte + pages selon la config.
+        GuideSync.registerFunctions();
+        GuideSync.refresh();
     }
 }

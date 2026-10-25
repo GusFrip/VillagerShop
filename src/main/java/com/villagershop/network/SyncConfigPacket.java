@@ -31,5 +31,6 @@ public record SyncConfigPacket(byte[] data) implements CustomPacketPayload {
     /** Receveur client (thread client). */
     public static void handleClient(SyncConfigPacket msg) {
         VSConfig.decodeAndApply(new FriendlyByteBuf(io.netty.buffer.Unpooled.wrappedBuffer(msg.data)));
+        com.villagershop.client.GuideSync.refresh(); // le guide suit la config du serveur
     }
 }
