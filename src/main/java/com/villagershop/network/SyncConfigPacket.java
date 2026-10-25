@@ -31,7 +31,12 @@ public class SyncConfigPacket {
     }
 
     public static void handle(SyncConfigPacket msg, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> VSConfig.decodeAndApply(msg.payload));
+        ctx.get().enqueueWork(() -> {
+            VSConfig.decodeAndApply(msg.payload);
+            // Le guide suit la config du serveur (client uniquement).
+            net.minecraftforge.fml.DistExecutor.unsafeRunWhenOn(net.minecraftforge.api.distmarker.Dist.CLIENT,
+                    () -> com.villagershop.client.GuideSync::refresh);
+        });
         ctx.get().setPacketHandled(true);
     }
 }

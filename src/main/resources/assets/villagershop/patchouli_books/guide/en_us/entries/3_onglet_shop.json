@@ -6,7 +6,13 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "book.villagershop.guide.e3.p1"
+      "text": "book.villagershop.guide.e3.p1",
+      "flag": "villagershop:access"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e3.p1.noaccess",
+      "flag": "villagershop:no_access"
     }
   ]
 }

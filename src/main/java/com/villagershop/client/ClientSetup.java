@@ -30,12 +30,18 @@ public class ClientSetup {
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
         event.enqueueWork(() -> {
+            // Guide Patchouli : fonctions de texte + pages selon la config.
+            GuideSync.registerFunctions();
+            GuideSync.refresh();
             MenuScreens.register(ModMenus.SHOP_CONFIG.get(), ShopConfigScreen::new);
             MenuScreens.register(ModMenus.SHOP_TRADE.get(), ShopTradeScreen::new);
             MenuScreens.register(ModMenus.SHOP_STOCK.get(), ShopStockScreen::new);
             MenuScreens.register(ModMenus.SHOP_MERCHANT.get(), MerchantScreen::new);
         });
         // À la déconnexion d'un serveur, on reprend la config locale (celle du serveur était synchronisée).
-        MinecraftForge.EVENT_BUS.addListener((ClientPlayerNetworkEvent.LoggingOut e) -> ShopConfigSpec.applyToRuntime());
+        MinecraftForge.EVENT_BUS.addListener((ClientPlayerNetworkEvent.LoggingOut e) -> {
+            ShopConfigSpec.applyToRuntime();
+            GuideSync.refresh();
+        });
     }
 }

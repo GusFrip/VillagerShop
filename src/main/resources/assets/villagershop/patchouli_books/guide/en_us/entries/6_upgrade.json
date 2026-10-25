@@ -10,36 +10,55 @@
     },
     {
       "type": "patchouli:text",
-      "text": "book.villagershop.guide.e6.p8"
+      "text": "book.villagershop.guide.e6.p8",
+      "flag": "villagershop:trades_many"
     },
     {
       "type": "patchouli:text",
-      "text": "book.villagershop.guide.e6.p2"
+      "text": "book.villagershop.guide.e6.p8.one",
+      "flag": "villagershop:trades_one"
     },
     {
       "type": "patchouli:text",
-      "text": "book.villagershop.guide.e6.p3"
+      "text": "book.villagershop.guide.e6.p2",
+      "flag": "villagershop:immortality"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e6.p3",
+      "flag": "villagershop:movement"
     },
     {
       "type": "patchouli:text",
       "text": "book.villagershop.guide.e6.p4",
+      "flag": "villagershop:storage_many",
       "anchor": "storage"
     },
     {
       "type": "patchouli:text",
-      "text": "book.villagershop.guide.e6.p5"
+      "text": "book.villagershop.guide.e6.p4.one",
+      "flag": "villagershop:storage_one",
+      "anchor": "storage"
     },
     {
       "type": "patchouli:text",
-      "text": "book.villagershop.guide.e6.p6"
+      "text": "book.villagershop.guide.e6.p5",
+      "flag": "villagershop:communication"
     },
     {
       "type": "patchouli:text",
-      "text": "book.villagershop.guide.e6.p7"
+      "text": "book.villagershop.guide.e6.p6",
+      "flag": "villagershop:access"
     },
     {
       "type": "patchouli:text",
-      "text": "book.villagershop.guide.e6.p9"
+      "text": "book.villagershop.guide.e6.p7",
+      "flag": "villagershop:memory"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e6.p9",
+      "flag": "villagershop:blast_protection"
     }
   ]
 }
