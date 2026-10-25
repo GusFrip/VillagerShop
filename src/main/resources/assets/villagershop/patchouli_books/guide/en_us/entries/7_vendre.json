@@ -10,7 +10,13 @@
     },
     {
       "type": "patchouli:text",
-      "text": "book.villagershop.guide.e7.p2"
+      "text": "book.villagershop.guide.e7.p2",
+      "flag": "villagershop:communication"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "book.villagershop.guide.e7.p2.nocomm",
+      "flag": "villagershop:no_communication"
     }
   ]
 }

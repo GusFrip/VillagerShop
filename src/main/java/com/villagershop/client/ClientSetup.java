@@ -37,7 +37,15 @@ public class ClientSetup {
 
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
+        // Guide Patchouli : fonctions de texte + pages selon la config.
+        event.enqueueWork(() -> {
+            GuideSync.registerFunctions();
+            GuideSync.refresh();
+        });
         // À la déconnexion d'un serveur, on reprend la config locale (celle du serveur était synchronisée).
-        NeoForge.EVENT_BUS.addListener((ClientPlayerNetworkEvent.LoggingOut e) -> ShopConfigSpec.applyToRuntime());
+        NeoForge.EVENT_BUS.addListener((ClientPlayerNetworkEvent.LoggingOut e) -> {
+            ShopConfigSpec.applyToRuntime();
+            GuideSync.refresh();
+        });
     }
 }

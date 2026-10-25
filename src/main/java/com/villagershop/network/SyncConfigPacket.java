@@ -30,6 +30,10 @@ public record SyncConfigPacket(byte[] data) implements CustomPacketPayload {
     @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
 
     public static void handle(SyncConfigPacket msg, IPayloadContext ctx) {
-        ctx.enqueueWork(() -> VSConfig.decodeAndApply(new FriendlyByteBuf(io.netty.buffer.Unpooled.wrappedBuffer(msg.data))));
+        // Enregistré en playToClient : ce handler ne tourne que côté client.
+        ctx.enqueueWork(() -> {
+            VSConfig.decodeAndApply(new FriendlyByteBuf(io.netty.buffer.Unpooled.wrappedBuffer(msg.data)));
+            com.villagershop.client.GuideSync.refresh(); // le guide suit la config du serveur
+        });
     }
 }
